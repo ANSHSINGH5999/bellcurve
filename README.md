@@ -22,7 +22,7 @@ Launchpads today price everything in SOL or USDC. That leaves out a whole class 
 | USD → equity curve engine | `src/lib/curve.ts` converts USD market-cap targets into raw stock units using the Jupiter price × the xStock **ScaledUiAmount multiplier**, so dividends don't silently reprice the curve. |
 | Keeper-floor guard | Meteora keepers auto-migrate stock-quoted pools only when `migration_quote_threshold ≥ $750` equivalent. The engine rejects plans below the floor and warns near it. |
 | 5 curve presets | Fair Discovery · Opening Bell (exponential anti-snipe fee, 50%→1% over 3 min) · Earnings Run (16-segment liquidity weights 1→12x) · Flat RWA (≈1.6x price range, compounding DAMM v2 after graduation) · Long Curve (two segments, $750k graduation). |
-| Preset export | `/presets` exports any preset as ready-to-use `ConfigParameters` JSON for other launchpads (a DBC config preset marketplace). |
+| Preset API (developer tooling) | `GET /api/presets?id=<preset>&stock=<symbol>` returns a ready DBC `ConfigParameters` for any preset × any xStock, priced live (Jupiter × ScaledUiAmount multiplier) with the keeper floor enforced, plus the TokenBadge to pass. BN fields are decimal strings, and a test revives them and runs the SDK validator. CORS is open, so trading terminals and other launchpads can call it directly. `GET /api/presets` lists presets and stocks. `/presets` has the same as copy-to-clipboard. |
 | Unsnipeable creator buy | `createConfigAndPoolWithFirstBuy` with `enableFirstSwapWithMinFee`: the creator's first buy lands in the pool-creation tx. |
 | Issuer-pause awareness | Reads the xStock `PausableConfig`. If the issuer pauses the mint, launch and trade are disabled in the UI instead of failing on-chain. |
 | Safe graduation | 60% of graduated LP is permanently locked (partner 50 + creator 10), and token authority is immutable. |
@@ -122,6 +122,7 @@ After the run the pool held 2.206 mock-stock in quote reserve, and the creator h
 
 - Alpha-vs-stock history chart (today the token page shows it since launch).
 - Sell to SOL (reverse of Buy with SOL).
+- DLMM conviction pools: after graduation, let holders add concentrated DLMM liquidity around the token/xStock price, completing the DBC → DAMM v2 → DLMM stack.
 - Basket quotes (e.g. a Mag-7 basket token as quote).
 - Market-cap-based DAMM v2 fee scheduler after graduation.
 - Referral fees paid in stock.

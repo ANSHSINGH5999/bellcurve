@@ -1,3 +1,4 @@
+import BN from 'bn.js'
 import { describe, expect, it } from 'vitest'
 import { validateConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { Keypair } from '@solana/web3.js'
@@ -47,5 +48,15 @@ describe('BellCurve launch engine', () => {
         expect(json.migrationQuoteThreshold).toBe(plan.config.migrationQuoteThreshold.toString(10))
         expect(json.sqrtStartPrice).toBe(plan.config.sqrtStartPrice.toString(10))
         expect(json.curve[0].liquidity).toBe(plan.config.curve[0].liquidity.toString(10))
+    })
+
+    it('exported JSON (what /api/presets serves) revives into a config the SDK validator accepts', () => {
+        for (const preset of PRESETS) {
+            const plan = buildLaunchPlan({ preset, usdPerRawStock: 232, stockDecimals: 8 })
+            // a consumer turns the BN-typed fields (decimal strings) back into BN
+            const revived = JSON.parse(configToJson(plan.config), (_, v) => (typeof v === 'string' && /^\d+$/.test(v) ? new BN(v) : v))
+            expect(() => validateConfigParameters({ ...revived, leftoverReceiver: KP } as never)).not.toThrow()
+            expect(revived.migrationQuoteThreshold.eq(plan.config.migrationQuoteThreshold)).toBe(true)
+        }
     })
 })

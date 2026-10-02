@@ -18,7 +18,7 @@ export default function PresetsPage() {
             <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold">Curve presets</h1>
-                    <p className="text-sm text-muted">Opinionated DBC configs for stock-quoted launches. Export any of them as JSON and plug it into your own launchpad.</p>
+                    <p className="text-sm text-muted">Opinionated DBC configs for stock-quoted launches. Export any of them as JSON, or fetch them live from <code className="mono">/api/presets?id=flat-rwa&amp;stock=NVDAx</code> and plug them into your own launchpad.</p>
                 </div>
                 <select className="input w-40" value={stockSym} onChange={(e) => setStockSym(e.target.value)}>
                     {XSTOCKS.map((s) => (
