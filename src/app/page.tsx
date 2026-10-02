@@ -7,6 +7,7 @@ import { listPlatformLaunches } from '@/lib/dbc'
 import { fetchTokenMeta, type TokenMeta } from '@/lib/metadata'
 import { fmtUsd, useUsdPrices } from '@/lib/hooks'
 import { XSTOCKS, getStock } from '@/lib/stocks'
+import { CLUSTER } from '@/lib/env'
 
 type Row = { mint: string; pool: string; quote: string; priceStock: number; progress: number; migrated: boolean }
 
@@ -72,6 +73,20 @@ export default function Home() {
                     ))}
                 </div>
             </section>
+
+            {CLUSTER === 'devnet' && (
+                <section className="card space-y-2 border-accent p-5">
+                    <h2 className="font-semibold">Try the whole flow free on devnet (test tokens, no real value)</h2>
+                    <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
+                        <li>Switch your wallet to devnet (Phantom: Settings → Developer Settings → Testnet Mode → Solana Devnet).</li>
+                        <li>Connect, then press <b className="text-text">Get test funds</b> (top right): 0.3 test SOL + 20 mNVDAx.</li>
+                        <li>
+                            <Link className="underline" href="/launch">Launch</Link> with the <b className="text-text">Devnet Demo</b> curve (graduates at ~5 mNVDAx), buy a little, then open its Conviction Pool and commit a sell wall.
+                        </li>
+                        <li>Buy the rest of the curve, press <b className="text-text">Graduate to DAMM v2</b>, and keep trading in the graduated pool.</li>
+                    </ol>
+                </section>
+            )}
 
             <section className="grid gap-4 sm:grid-cols-3">
                 {[

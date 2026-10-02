@@ -1,22 +1,38 @@
-import { Connection, PublicKey, type ConfirmedSignatureInfo, type VersionedTransactionResponse } from '@solana/web3.js'
-import { DynamicBondingCurveIdl, DYNAMIC_BONDING_CURVE_PROGRAM_ID } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { Connection, PublicKey, type ConfirmedSignatureInfo } from '@solana/web3.js'
+import type { PoolConfig, VirtualPool } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { dbcClient, LAUNCH_MEMO_PREFIX } from './dbc'
 
 /**
- * Launch index without getProgramAccounts (which most free RPCs block):
- * create_config lists the platform wallet as `fee_claimer`, so the platform wallet's signature history
- * contains every BellCurve config. Each config's oldest transactions contain its pool initialization.
+ * Launch index without getProgramAccounts or getTransaction (free RPCs block the first and throttle the second):
+ * every BellCurve pool tx sends 0 lamports to the platform wallet and carries the memo `bellcurve:v1:<pool>`,
+ * and getSignaturesForAddress returns memos inline. Anyone can forge a memo, so each pool is verified on-chain:
+ * it must be a DBC pool whose config pays the platform wallet.
  */
 export type LaunchRef = { config: string; quoteMint: string; pool: string; baseMint: string; createdAt: number | null }
 
-const disc = (name: string) => Buffer.from(DynamicBondingCurveIdl.instructions.find((i) => i.name === name)!.discriminator)
-const CREATE_CONFIG = disc('create_config')
-const INIT_POOL = [disc('initialize_virtual_pool_with_token2022'), disc('initialize_virtual_pool_with_spl_token')]
+const MEMO_RE = new RegExp(`${LAUNCH_MEMO_PREFIX}([1-9A-HJ-NP-Za-km-z]{32,44})`)
+
+/** Free RPCs answer bursts with 429: space calls out and back off before giving up. */
+let lastCall = 0
+async function paced<T>(f: () => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+        const wait = lastCall + 250 - Date.now()
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+        lastCall = Date.now()
+        try {
+            return await f()
+        } catch (e) {
+            if (attempt >= 3 || !String((e as Error).message).includes('429')) throw e
+            await new Promise((r) => setTimeout(r, 1500 * 2 ** attempt))
+        }
+    }
+}
 
 async function allSignatures(conn: Connection, address: PublicKey, maxPages = 10) {
     const out: ConfirmedSignatureInfo[] = []
     let before: string | undefined
     for (let i = 0; i < maxPages; i++) {
-        const page = await conn.getSignaturesForAddress(address, { before, limit: 1000 })
+        const page = await paced(() => conn.getSignaturesForAddress(address, { before, limit: 1000 }))
         out.push(...page)
         if (page.length < 1000) break
         before = page[page.length - 1].signature
@@ -24,71 +40,40 @@ async function allSignatures(conn: Connection, address: PublicKey, maxPages = 10
     return out.filter((s) => !s.err)
 }
 
-/** DBC instructions in a tx as [accountKeys, data], with lookup-table keys resolved. */
-function dbcInstructions(tx: VersionedTransactionResponse) {
-    const msg = tx.transaction.message
-    const keys = msg.getAccountKeys({ accountKeysFromLookups: tx.meta?.loadedAddresses }).keySegments().flat()
-    return msg.compiledInstructions
-        .filter((ix) => keys[ix.programIdIndex].equals(DYNAMIC_BONDING_CURVE_PROGRAM_ID))
-        .map((ix) => ({ accounts: ix.accountKeyIndexes.map((i) => keys[i]), data: Buffer.from(ix.data) }))
-}
-
-const getTx = (conn: Connection, sig: string) => conn.getTransaction(sig, { maxSupportedTransactionVersion: 0, commitment: 'confirmed' })
-
-// launches are immutable once found, so cache per server instance: each tx is fetched at most once
-const configsBySig = new Map<string, { config: PublicKey; quoteMint: PublicKey }[]>()
-const launchByConfig = new Map<string, LaunchRef>()
-
-/** Bound per request: anyone can spam a public wallet with dust txs, and each uncached one costs an RPC call. */
-const MAX_NEW_TX_PER_REQUEST = 150
+// verified launches never change, so each pool is checked at most once per server instance
+const verified = new Map<string, LaunchRef | null>()
 
 export async function findLaunches(conn: Connection, platform: PublicKey): Promise<LaunchRef[]> {
-    // sequential on purpose: free RPCs rate-limit bursts of getTransaction
-    const configs: { config: PublicKey; quoteMint: PublicKey }[] = []
-    let budget = MAX_NEW_TX_PER_REQUEST
-    for (const s of await allSignatures(conn, platform)) {
-        let found = configsBySig.get(s.signature)
-        if (!found) {
-            if (budget-- <= 0) continue // picked up by a later request; results are cached
-
-            const tx = await getTx(conn, s.signature)
-            if (!tx) continue
-            found = dbcInstructions(tx)
-                // create_config accounts: config, fee_claimer, leftover_receiver, quote_mint, payer, ...
-                .filter((ix) => ix.data.subarray(0, 8).equals(CREATE_CONFIG) && ix.accounts[1].equals(platform))
-                .map((ix) => ({ config: ix.accounts[0], quoteMint: ix.accounts[3] }))
-            configsBySig.set(s.signature, found)
-        }
-        configs.push(...found)
-    }
-
+    const client = dbcClient(conn)
     const launches: LaunchRef[] = []
-    for (const { config, quoteMint } of configs) {
-        const cached = launchByConfig.get(config.toBase58())
-        if (cached) {
-            launches.push(cached)
-            continue
-        }
-        // pool init is the 2nd tx ever to touch the config; signatures come newest-first
-        const sigs = (await allSignatures(conn, config)).slice(-3).reverse()
-        search: for (const s of sigs) {
-            const tx = await getTx(conn, s.signature)
-            for (const ix of tx ? dbcInstructions(tx) : []) {
-                // initialize_virtual_pool_*: config, pool_authority, creator, base_mint, quote_mint, pool, ...
-                if (INIT_POOL.some((d) => ix.data.subarray(0, 8).equals(d)) && ix.accounts[0].equals(config)) {
-                    const ref = {
-                        config: config.toBase58(),
-                        quoteMint: quoteMint.toBase58(),
-                        pool: ix.accounts[5].toBase58(),
-                        baseMint: ix.accounts[3].toBase58(),
-                        createdAt: s.blockTime ?? null,
-                    }
-                    launchByConfig.set(ref.config, ref)
-                    launches.push(ref)
-                    break search
-                }
+    for (const s of await allSignatures(conn, platform)) {
+        const pool = s.memo?.match(MEMO_RE)?.[1]
+        if (!pool) continue
+        if (!verified.has(pool)) {
+            // a failed read is retried on the next request; only a definitive answer is cached
+            let state: VirtualPool | null, config: PoolConfig | null
+            try {
+                state = await paced(() => client.state.getPool(pool))
+                const cfgKey = state?.poolState.config
+                config = cfgKey ? await paced(() => client.state.getPoolConfig(cfgKey)) : null
+            } catch {
+                continue
             }
+            verified.set(
+                pool,
+                state && config && config.feeClaimer.equals(platform)
+                    ? {
+                          config: state.poolState.config.toBase58(),
+                          quoteMint: config.quoteMint.toBase58(),
+                          pool,
+                          baseMint: state.poolState.baseMint.toBase58(),
+                          createdAt: s.blockTime ?? null,
+                      }
+                    : null
+            )
         }
+        const ref = verified.get(pool)
+        if (ref && !launches.some((l) => l.pool === pool)) launches.push(ref)
     }
     return launches.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
 }

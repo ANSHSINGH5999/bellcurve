@@ -3,8 +3,11 @@ import { useMemo, useState } from 'react'
 import CurveChart from '@/components/CurveChart'
 import { buildLaunchPlan, configToJson } from '@/lib/curve'
 import { fmtUsd, useUsdPrices } from '@/lib/hooks'
-import { PRESETS } from '@/lib/presets'
+import { presetsFor } from '@/lib/presets'
+import { CLUSTER } from '@/lib/env'
 import { XSTOCKS } from '@/lib/stocks'
+
+const PRESETS = presetsFor(CLUSTER)
 
 /** Preset gallery — every preset is exportable as a ready-to-use DBC ConfigParameters JSON for other launchpads. */
 export default function PresetsPage() {

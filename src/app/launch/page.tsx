@@ -9,10 +9,12 @@ import { buildLaunchPlan, LaunchPlanError, type LaunchPlan } from '@/lib/curve'
 import { buildLaunchTx, confirmOrThrow } from '@/lib/dbc'
 import { CLUSTER, SITE_URL, explorer } from '@/lib/env'
 import { fmtUsd, useStockQuote, useUsdPrices } from '@/lib/hooks'
-import { PRESETS, getPreset } from '@/lib/presets'
+import { getPreset, presetsFor } from '@/lib/presets'
 import { DEVNET_MOCK_STOCK, XSTOCKS, getStock } from '@/lib/stocks'
 
 const STOCKS = CLUSTER === 'devnet' && DEVNET_MOCK_STOCK.mint ? [DEVNET_MOCK_STOCK] : XSTOCKS
+const PRESETS = presetsFor(CLUSTER)
+const DEFAULT_PRESET = CLUSTER === 'devnet' ? 'devnet-demo' : PRESETS[0].id
 
 export default function LaunchPage() {
     const router = useRouter()
@@ -24,7 +26,7 @@ export default function LaunchPage() {
     const [symbol, setSymbol] = useState('')
     const [image, setImage] = useState('')
     const [stockSym, setStockSym] = useState(STOCKS[0].symbol)
-    const [presetId, setPresetId] = useState(PRESETS[0].id)
+    const [presetId, setPresetId] = useState(DEFAULT_PRESET)
     const [startMcap, setStartMcap] = useState<number | ''>('')
     const [gradMcap, setGradMcap] = useState<number | ''>('')
     const [creatorShare, setCreatorShare] = useState(50)

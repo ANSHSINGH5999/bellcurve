@@ -1,7 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import BN from 'bn.js'
-import type { PublicKey, Transaction } from '@solana/web3.js'
+import { PublicKey, type Transaction } from '@solana/web3.js'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
@@ -10,6 +10,7 @@ import {
     buildWithdrawTx,
     listMyCommitments,
     loadConvictionPool,
+    quoteCommitCost,
     readLadder,
     type ConvictionPool,
 } from '@/lib/conviction'
@@ -19,6 +20,21 @@ import { fmtUsd } from '@/lib/hooks'
 
 type Ladder = Awaited<ReturnType<typeof readLadder>>
 type Mine = Awaited<ReturnType<typeof listMyCommitments>>
+
+// Free RPCs throttle the account scan behind listMyCommitments, so also remember orders placed from this browser.
+const storeKey = (pool: PublicKey, owner: PublicKey) => `bc:orders:${pool.toBase58()}:${owner.toBase58()}`
+function storedOrders(pool: PublicKey, owner: PublicKey): string[] {
+    try {
+        return JSON.parse(localStorage.getItem(storeKey(pool, owner)) ?? '[]')
+    } catch {
+        return []
+    }
+}
+function rememberOrder(pool: PublicKey, owner: PublicKey, order: PublicKey) {
+    try {
+        localStorage.setItem(storeKey(pool, owner), JSON.stringify([...new Set([...storedOrders(pool, owner), order.toBase58()])]))
+    } catch {}
+}
 
 const RANGES = {
     wall: [
@@ -55,13 +71,25 @@ export default function ConvictionPanel(props: {
     const [amt, setAmt] = useState('')
     const [msg, setMsg] = useState('')
     const [busy, setBusy] = useState(false)
+    const [cost, setCost] = useState<Awaited<ReturnType<typeof quoteCommitCost>> | null>(null)
 
     const refresh = useCallback(async () => {
         const p = await loadConvictionPool(connection, base, quote).catch(() => null)
         setPool(p)
         if (!p) return
         setLadder(await readLadder(p, TOTAL_SUPPLY).catch(() => null))
-        if (wallet.publicKey) setMine(await listMyCommitments(p, wallet.publicKey).catch(() => []))
+        if (wallet.publicKey) {
+            const owner = wallet.publicKey
+            const scanned = await listMyCommitments(p, owner).catch(() => [] as Mine)
+            const known = new Set(scanned.map((o) => o.publicKey.toBase58()))
+            const extra = await Promise.all(
+                storedOrders(p.address, owner)
+                    .filter((k) => !known.has(k))
+                    .map((k) => p.dlmm.getLimitOrder(new PublicKey(k)).catch(() => null))
+            )
+            // withdrawn orders are closed and simply drop out
+            setMine([...scanned, ...extra.filter((o): o is Mine[number] => !!o && o.limitOrderData.limitOrderBinData.some((b) => !b.empty))])
+        }
     }, [connection, base, quote, wallet.publicKey])
 
     useEffect(() => {
@@ -70,15 +98,24 @@ export default function ConvictionPanel(props: {
         return () => clearInterval(t)
     }, [refresh])
 
-    async function run(label: string, build: () => Promise<{ tx: Transaction }>) {
+    const market = ladder?.marketPrice
+    useEffect(() => {
+        setCost(null)
+        if (!pool || !market) return
+        const r = RANGES[kind][range]
+        quoteCommitCost(pool, kind, market * r.from, market * r.to).then(setCost, () => setCost(null))
+    }, [pool, market, kind, range])
+
+    async function run(label: string, build: () => Promise<{ tx: Transaction; order?: PublicKey }>) {
         if (!wallet.publicKey || !wallet.signTransaction) return
         setBusy(true)
         try {
             setMsg('Confirm in wallet…')
-            const { tx } = await build()
+            const { tx, order } = await build()
             const sig = await connection.sendRawTransaction((await wallet.signTransaction(tx)).serialize())
             setMsg(`${label}…`)
             await confirmOrThrow(connection, sig)
+            if (order && pool) rememberOrder(pool.address, wallet.publicKey, order)
             setMsg(`✅ ${label} — ${sig.slice(0, 10)}…`)
             setAmt('')
             await refresh()
@@ -214,7 +251,13 @@ export default function ConvictionPanel(props: {
                 <button className="btn btn-primary w-full" disabled={!owner || busy || !(Number(amt) > 0) || !ladder} onClick={commit}>
                     {owner ? (kind === 'wall' ? 'Commit sell wall' : 'Commit support') : 'Connect wallet to commit'}
                 </button>
-                <p className="text-xs text-muted">Each commitment holds a small SOL rent deposit, refunded when you withdraw. Withdraw any time.</p>
+                <p className="text-xs text-muted">
+                    {cost
+                        ? `Cost: ${cost.refundableSol.toFixed(4)} SOL deposit (refunded when you withdraw)${
+                              cost.oneTimeSol > 0 ? ` + ${cost.oneTimeSol.toFixed(4)} SOL one-time DLMM rent: you're first in this price range (${cost.newBinArrays} bin array${cost.newBinArrays === 1 ? '' : 's'}), so this part isn't refunded` : ''
+                          }. Withdraw unfilled amounts any time.`
+                        : 'Calculating cost…'}
+                </p>
             </div>
 
             {mine.length > 0 && (

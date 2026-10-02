@@ -26,6 +26,8 @@ export type CurvePreset = {
     /** DAMM v2 collect mode after graduation: 0 quote (earn stock), 2 compounding */
     migratedCollectMode: 0 | 2
     bestFor: string[]
+    /** only offered on the devnet demo deployment */
+    devnetOnly?: boolean
 }
 
 const ramp = (from: number, to: number) =>
@@ -106,6 +108,24 @@ export const PRESETS: CurvePreset[] = [
         migratedCollectMode: 0,
         bestFor: ['serious projects', 'DAOs'],
     },
+    {
+        id: 'devnet-demo',
+        name: 'Devnet Demo',
+        tagline: 'Graduates with ~5 test stock, so you can try the whole flow',
+        description:
+            'A small constant-product curve ($400 to $4.4k market cap, ~$1k raise) so one person with faucet funds can launch, fill the curve, graduate into DAMM v2 and open a Conviction Pool on devnet.',
+        kind: 'marketCap',
+        startMcapUsd: 400,
+        gradMcapUsd: 4_400,
+        feeBps: 100,
+        migratedFeeBps: 50,
+        migratedCollectMode: 0,
+        bestFor: ['trying BellCurve'],
+        devnetOnly: true,
+    },
 ]
 
 export const getPreset = (id: string) => PRESETS.find((p) => p.id === id) ?? PRESETS[0]
+
+/** presets a deployment offers: the devnet demo curve only on devnet */
+export const presetsFor = (cluster: string) => PRESETS.filter((p) => cluster === 'devnet' || !p.devnetOnly)

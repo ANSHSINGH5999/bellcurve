@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { Connection } from '@solana/web3.js'
 import { buildLaunchPlan, configToJson, LaunchPlanError } from '@/lib/curve'
-import { RPC_URL } from '@/lib/env'
+import { CLUSTER, RPC_URL } from '@/lib/env'
+
+const PRESETS = presetsFor(CLUSTER)
 import { getStockPrice } from '@/lib/price'
-import { PRESETS } from '@/lib/presets'
+import { presetsFor } from '@/lib/presets'
 import { getStock, tokenBadgeFor, XSTOCKS } from '@/lib/stocks'
 
 export const revalidate = 0

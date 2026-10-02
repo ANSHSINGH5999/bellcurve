@@ -5,12 +5,12 @@ import BN from 'bn.js'
 import type { PublicKey } from '@solana/web3.js'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
-import { getPriceFromSqrtPrice, type ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { DAMM_V2_MIGRATION_FEE_ADDRESS, getPriceFromSqrtPrice, type ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import ConvictionPanel from '@/components/ConvictionPanel'
 import CurveChart from '@/components/CurveChart'
 import { simulateCurve, TOTAL_SUPPLY } from '@/lib/curve'
 import { buildSwapTx, confirmOrThrow, dbcClient, loadPoolByMint, quoteSwap, withPriorityFee, type PoolView } from '@/lib/dbc'
-import { explorer } from '@/lib/env'
+import { CLUSTER, explorer } from '@/lib/env'
 import { fmtUsd, useStockQuote } from '@/lib/hooks'
 import { fetchTokenImage, fetchTokenMeta, type TokenMeta } from '@/lib/metadata'
 import { getPreset } from '@/lib/presets'
@@ -98,6 +98,7 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
                         {derived.raisedStock.toFixed(3)} / {(Number(view.config.migrationQuoteThreshold.toString()) / 10 ** qDec).toFixed(3)} {stock?.symbol} raised
                         ({fmtUsd(derived.raisedStock * usdPerRaw, 0)})
                     </div>
+                    {view.progress >= 1 && !view.pool.poolState.isMigrated && <GraduateButton view={view} onDone={refresh} />}
                     <div className="mt-4">
                         <CurveChart points={derived.points} color={stock?.color} marker={derived.marker} />
                     </div>
@@ -147,6 +148,44 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
                     <button className="btn btn-ghost w-full" onClick={() => setVisible(true)}>Connect wallet to trade</button>
                 )}
             </section>
+        </div>
+    )
+}
+
+/** Migration is permissionless: Meteora keepers usually run it on mainnet; on devnet (no keepers) anyone can press this. */
+function GraduateButton({ view, onDone }: { view: PoolView; onDone: () => void }) {
+    const { connection } = useConnection()
+    const wallet = useWallet()
+    const [msg, setMsg] = useState('')
+    async function graduate() {
+        if (!wallet.publicKey || !wallet.signTransaction) return setMsg('Connect a wallet to graduate this curve')
+        try {
+            setMsg('Confirm in wallet…')
+            const m = await dbcClient(connection).migration.migrateToDammV2({
+                payer: wallet.publicKey,
+                pool: view.address,
+                dammConfig: DAMM_V2_MIGRATION_FEE_ADDRESS[view.config.migrationFeeOption],
+            })
+            m.transaction.feePayer = wallet.publicKey
+            m.transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
+            await withPriorityFee(connection, m.transaction)
+            // both position-NFT keypairs co-sign; the wallet signs last
+            m.transaction.partialSign(m.firstPositionNftKeypair, m.secondPositionNftKeypair)
+            const sig = await connection.sendRawTransaction((await wallet.signTransaction(m.transaction)).serialize())
+            setMsg('Migrating into DAMM v2…')
+            await confirmOrThrow(connection, sig)
+            setMsg('✅ Graduated into Meteora DAMM v2')
+            onDone()
+        } catch (e) {
+            setMsg(`❌ ${(e as Error).message}`)
+        }
+    }
+    return (
+        <div className="mt-3 space-y-1">
+            <button className="btn btn-primary w-full" onClick={graduate}>
+                🎓 Curve complete: graduate to DAMM v2
+            </button>
+            {msg && <p className="text-xs text-muted break-all">{msg}</p>}
         </div>
     )
 }
@@ -264,7 +303,8 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
                     </button>
                 ))}
             </div>
-            {!sell && (
+            {/* Jupiter only routes on mainnet */}
+            {!sell && CLUSTER !== 'devnet' && (
                 <div className="flex gap-2 text-xs">
                     {[false, true].map((v) => (
                         <button key={String(v)} onClick={() => setPaySol(v)} className={`tag ${paySol === v ? 'border-accent text-accent' : ''}`}>

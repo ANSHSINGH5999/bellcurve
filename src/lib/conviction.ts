@@ -90,6 +90,34 @@ export type ConvictionPool = NonNullable<Awaited<ReturnType<typeof loadConvictio
  * A commitment = one limit order spread evenly over bins between two prices (quote per base).
  * kind 'wall': sell base at prices ≥ fromPrice. kind 'support': buy base with quote at prices ≤ fromPrice.
  */
+/** Which side and which bins a commitment uses (bins needn't be adjacent). */
+async function planBins(pool: ConvictionPool, kind: 'wall' | 'support', fromPrice: number, toPrice: number) {
+    await pool.dlmm.refetchStates()
+    const active = pool.dlmm.lbPair.activeId
+    const ids = [binIdForPrice(fromPrice, pool.o), binIdForPrice(toPrice, pool.o)]
+    // selling base = asking X when base is X, bidding (selling Y) when base is Y
+    const isAskSide = (kind === 'wall') === pool.o.baseIsX
+    // asks must sit above the active bin, bids below — clamp so an order never crosses the market
+    let lo = Math.min(...ids)
+    let hi = Math.max(...ids)
+    if (isAskSide) lo = Math.max(lo, active + 1)
+    else hi = Math.min(hi, active - 1)
+    if (hi < lo) throw new Error(kind === 'wall' ? 'Wall prices must be above the current price' : 'Support prices must be below the current price')
+    const n = Math.min(MAX_BINS_PER_COMMIT, hi - lo + 1)
+    return { isAskSide, ids: [...new Set(Array.from({ length: n }, (_, i) => Math.round(lo + (n === 1 ? 0 : ((hi - lo) * i) / (n - 1)))))] }
+}
+
+/**
+ * SOL a commitment costs before signing. The limit-order account is refunded on withdraw; DLMM bin arrays
+ * (and the bitmap extension) are one-time rent paid by whoever first uses that price range.
+ */
+export async function quoteCommitCost(pool: ConvictionPool, kind: 'wall' | 'support', fromPrice: number, toPrice: number) {
+    const { ids } = await planBins(pool, kind, fromPrice, toPrice)
+    const q = await pool.dlmm.quoteCreateLimitOrder({ bins: ids.map((id) => ({ id })) })
+    // all three are already in SOL
+    return { refundableSol: q.limitOrderCost, oneTimeSol: q.binArrayCost + q.bitmapExtensionCost, newBinArrays: q.binArraysCount }
+}
+
 export async function buildCommitTx(args: {
     connection: Connection
     pool: ConvictionPool
@@ -100,20 +128,8 @@ export async function buildCommitTx(args: {
     fromPrice: number
     toPrice: number
 }) {
-    const { pool, kind } = args
-    await pool.dlmm.refetchStates()
-    const active = pool.dlmm.lbPair.activeId
-    const ids = [binIdForPrice(args.fromPrice, pool.o), binIdForPrice(args.toPrice, pool.o)]
-    // selling base = asking X when base is X, bidding (selling Y) when base is Y
-    const isAskSide = (kind === 'wall') === pool.o.baseIsX
-    // asks must sit above the active bin, bids below — clamp so an order never crosses the market
-    let lo = Math.min(...ids)
-    let hi = Math.max(...ids)
-    if (isAskSide) lo = Math.max(lo, active + 1)
-    else hi = Math.min(hi, active - 1)
-    if (hi < lo) throw new Error(kind === 'wall' ? 'Wall prices must be above the current price' : 'Support prices must be below the current price')
-    const n = Math.min(MAX_BINS_PER_COMMIT, hi - lo + 1)
-    const ids2 = [...new Set(Array.from({ length: n }, (_, i) => Math.round(lo + (n === 1 ? 0 : ((hi - lo) * i) / (n - 1)))))]
+    const { pool } = args
+    const { isAskSide, ids: ids2 } = await planBins(pool, args.kind, args.fromPrice, args.toPrice)
     const per = args.amount.divn(ids2.length)
     if (per.isZero()) throw new Error('Amount too small to spread across these prices')
     const bins = ids2.map((id, i) => ({ id, amount: i === ids2.length - 1 ? args.amount.sub(per.muln(ids2.length - 1)) : per }))

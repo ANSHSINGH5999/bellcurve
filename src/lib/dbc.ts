@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction, type TransactionInstruction } from '@solana/web3.js'
+import { ComputeBudgetProgram, Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js'
 import {
     DynamicBondingCurveClient,
     getCurrentPoint,
@@ -42,6 +42,9 @@ export async function withPriorityFee(connection: Connection, tx: Transaction, f
     tx.instructions.unshift(...pre)
     return tx
 }
+
+export const MEMO_PROGRAM = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
+export const LAUNCH_MEMO_PREFIX = 'bellcurve:v1:'
 
 export const dbcClient = (connection: Connection) => new DynamicBondingCurveClient(connection, 'confirmed')
 
@@ -100,6 +103,14 @@ export async function buildLaunchTx(args: {
                 : undefined,
     })
 
+    const pool = await poolAddressFor(configKeypair.publicKey, baseMintKeypair.publicKey, quoteMint)
+    // index marker: the 0-lamport transfer puts this tx in the platform wallet's history, and the memo carries the
+    // pool address, so /api/launches needs one getSignaturesForAddress call (memos come back with it)
+    res.createPoolWithFirstBuyTx.add(
+        SystemProgram.transfer({ fromPubkey: args.creator, toPubkey: PLATFORM_FEE_CLAIMER, lamports: 0 }),
+        new TransactionInstruction({ programId: MEMO_PROGRAM, keys: [], data: Buffer.from(`${LAUNCH_MEMO_PREFIX}${pool.toBase58()}`) })
+    )
+
     const { blockhash } = await args.connection.getLatestBlockhash('confirmed')
     const txs = [res.createConfigTx, res.createPoolWithFirstBuyTx]
     for (const tx of txs) {
@@ -110,8 +121,6 @@ export async function buildLaunchTx(args: {
     await Promise.all(txs.map((tx) => withPriorityFee(args.connection, tx)))
     txs[0].partialSign(configKeypair)
     txs[1].partialSign(baseMintKeypair)
-
-    const pool = await poolAddressFor(configKeypair.publicKey, baseMintKeypair.publicKey, quoteMint)
     return { txs, configKeypair, baseMintKeypair, pool }
 }
 
