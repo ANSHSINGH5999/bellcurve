@@ -51,9 +51,14 @@
 
 **One-liner:** A Meteora DBC launchpad where every bonding curve is quoted in a tokenized stock (SPYx, NVDAx, TSLAx…), so buyers pay in stock, creators earn stock, and every graduation seeds a DAMM v2 xStock pool.
 
-**What it does:** StockCurve creates a dedicated DBC config per launch with an xStock as the quote mint, passing the mint's DBC TokenBadge. A USD → equity curve engine converts market-cap targets into raw stock units using live Jupiter prices and each xStock's ScaledUiAmount dividend multiplier. It enforces Meteora's $750 keeper floor so every curve auto-graduates to DAMM v2. Five presets ship with it (including an exponential anti-snipe "Opening Bell" and a near-flat "Flat RWA" curve that graduates into a compounding DAMM v2 pool), and each one is exportable as ConfigParameters JSON. Creators' first buys land in the creation tx, fees are paid in stock, and 60% of graduated LP is permanently locked.
+**What it does:** StockCurve creates a dedicated DBC config per launch with an xStock as the quote mint, passing the mint's DBC TokenBadge. A USD → equity curve engine converts market-cap targets into raw stock units using live Jupiter prices and each xStock's ScaledUiAmount dividend multiplier. It enforces Meteora's $750 keeper floor so every curve auto-graduates to DAMM v2. Five presets ship with it (including an exponential anti-snipe "Opening Bell" and a near-flat "Flat RWA" curve that graduates into a compounding DAMM v2 pool), and each one is exportable as ConfigParameters JSON. Creators' first buys land in the creation tx, fees are paid in stock, and 60% of graduated LP is permanently locked. Buys use DBC's PartialFill swap mode, so the graduating buy can never revert. The full lifecycle (launch → trade → claim → migrate to DAMM v2) is tested for all five presets against real mainnet program and NVDAx state.
 
-**Links:** GitHub · Live app · Demo video · Example mainnet token · Devnet e2e tx signatures
+**Links:**
+- GitHub: https://github.com/ANSHSINGH5999/stockcurve
+- Live app: https://stockcurve.vercel.app
+- Demo video: TODO
+- Example mainnet token: TODO (after the first real NVDAx launch)
+- Proof: README "Proof" section (devnet tx signatures) and `pnpm fork:e2e`, which runs every preset on cloned mainnet state (real DBC + DAMM v2 programs, real NVDAx mint and TokenBadges) from launch through creator fee claim to graduation into DAMM v2.
 
 ## Rules to stay safe
 
