@@ -23,6 +23,6 @@ export async function GET(req: Request) {
             ],
             properties: { category: 'image', files: image ? [{ uri: image, type: 'image/png' }] : [] },
         },
-        { headers: { 'cache-control': 'public, max-age=31536000, immutable' } }
+        { headers: { 'cache-control': 'public, max-age=31536000, immutable', 'access-control-allow-origin': '*' } }
     )
 }

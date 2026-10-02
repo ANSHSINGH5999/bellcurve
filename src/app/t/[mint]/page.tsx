@@ -10,7 +10,7 @@ import { simulateCurve, TOTAL_SUPPLY } from '@/lib/curve'
 import { buildSwapTx, confirmOrThrow, dbcClient, loadPoolByMint, quoteSwap, type PoolView } from '@/lib/dbc'
 import { explorer } from '@/lib/env'
 import { fmtUsd, useStockQuote } from '@/lib/hooks'
-import { fetchTokenMeta, type TokenMeta } from '@/lib/metadata'
+import { fetchTokenImage, fetchTokenMeta, type TokenMeta } from '@/lib/metadata'
 import { getPreset } from '@/lib/presets'
 import { getStock } from '@/lib/stocks'
 import { buildSolToStockTx, quoteSolToStock, type JupQuote } from '@/lib/zap'
@@ -27,7 +27,12 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
     const refresh = useCallback(() => loadPoolByMint(connection, mint, poolHint).then(setView).catch(() => setView(null)), [connection, mint, poolHint])
     useEffect(() => {
         refresh()
-        fetchTokenMeta(connection, mint).then(setMeta).catch(() => {})
+        fetchTokenMeta(connection, mint)
+            .then((m) => {
+                setMeta(m)
+                if (m) fetchTokenImage(m).then((image) => image && setMeta({ ...m, image })).catch(() => {})
+            })
+            .catch(() => {})
         const t = setInterval(refresh, 10_000)
         return () => clearInterval(t)
     }, [connection, mint, refresh])
@@ -61,6 +66,7 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
         <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
             <section className="space-y-4">
                 <div className="card flex items-center gap-4 p-5">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- creator-supplied image URLs from any host */}
                     {meta?.image ? <img src={meta.image} alt="" className="h-14 w-14 rounded-xl object-cover" /> : <div className="h-14 w-14 rounded-xl bg-line" />}
                     <div className="flex-1">
                         <div className="text-xl font-bold">
@@ -149,6 +155,7 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
     const [msg, setMsg] = useState('')
     const sell = side === 'sell'
     const viaSol = paySol && !sell
+    const priceKey = view.pool.poolState.sqrtPrice.toString()
     const inDec = sell ? baseDec : viaSol ? 9 : qDec
     const outDec = sell ? qDec : baseDec
     // wallets show xStocks in UI units (raw × ScaledUiAmount multiplier); the curve trades raw units
@@ -176,8 +183,8 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
             }
         }, 300)
         return () => clearTimeout(t)
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- toRaw is derived from the listed deps
-    }, [amt, sell, viaSol, inDec, multiplier, connection, view])
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- toRaw/view are covered by the listed deps (priceKey = pool price)
+    }, [amt, sell, viaSol, inDec, multiplier, connection, priceKey])
 
     async function trade() {
         if (!wallet.publicKey || !wallet.signTransaction || !out) return
@@ -205,6 +212,18 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
         } catch (e) {
             setMsg(`❌ ${(e as Error).message}`)
         }
+    }
+
+    if (view.pool.poolState.isMigrated) {
+        const base = view.pool.poolState.baseMint.toBase58()
+        return (
+            <div className="card space-y-3 p-5">
+                <p className="text-sm">🎓 This curve graduated. The token now trades in its Meteora DAMM v2 pool, still paired with {stockSymbol}.</p>
+                <a className="btn btn-primary w-full text-center" href={`https://jup.ag/swap?sell=${view.config.quoteMint.toBase58()}&buy=${base}`} target="_blank" rel="noreferrer">
+                    Trade on Jupiter
+                </a>
+            </div>
+        )
     }
 
     const outNum = out ? (Number(out.out.toString()) / 10 ** outDec) * (sell ? multiplier : 1) : 0
@@ -243,8 +262,8 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
                     This buy completes the curve 🎓 — only part of it is used; {((Number(out.left.toString()) / 10 ** qDec) * multiplier).toFixed(4)} {stockSymbol} stays in your wallet.
                 </p>
             )}
-            <button className="btn btn-primary w-full" disabled={!wallet.publicKey || !out || paused || view.pool.poolState.isMigrated === 1} onClick={trade}>
-                {view.pool.poolState.isMigrated ? 'Trade on Meteora DAMM v2' : paused ? `${stockSymbol} paused` : sell ? 'Sell' : 'Buy'}
+            <button className="btn btn-primary w-full" disabled={!wallet.publicKey || !out || paused} onClick={trade}>
+                {paused ? `${stockSymbol} paused` : sell ? 'Sell' : 'Buy'}
             </button>
             {msg && <p className="text-xs text-muted break-all">{msg}</p>}
         </div>

@@ -20,14 +20,18 @@ export async function fetchTokenMeta(connection: Connection, mint: string): Prom
     }
     const meta: TokenMeta = { name: str(), symbol: str(), uri: str() }
     try {
+        // our own /api/meta URIs carry everything in the query string, so no fetch is needed
         const u = new URL(meta.uri)
-        meta.image = u.searchParams.get('i') ?? undefined
+        meta.image = u.searchParams.get('i') || undefined
         meta.quote = u.searchParams.get('q') ?? undefined
         meta.preset = u.searchParams.get('p') ?? undefined
-        if (!meta.image) {
-            const j = await fetch(meta.uri).then((r) => r.json())
-            meta.image = j.image
-        }
     } catch {}
     return meta
+}
+
+/** Image for a foreign (non-BellCurve) metadata URI; bounded so a slow host can't stall the page. */
+export async function fetchTokenImage(meta: TokenMeta): Promise<string | undefined> {
+    if (meta.image || new URL(meta.uri).searchParams.has('n')) return meta.image
+    const j = await fetch(meta.uri, { signal: AbortSignal.timeout(5_000) }).then((r) => r.json())
+    return typeof j.image === 'string' ? j.image : undefined
 }

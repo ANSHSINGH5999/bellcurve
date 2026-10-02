@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import CurveChart from '@/components/CurveChart'
-import { buildLaunchPlan } from '@/lib/curve'
+import { buildLaunchPlan, configToJson } from '@/lib/curve'
 import { fmtUsd, useUsdPrices } from '@/lib/hooks'
 import { PRESETS } from '@/lib/presets'
 import { XSTOCKS } from '@/lib/stocks'
@@ -41,8 +41,7 @@ function PresetCard({ id, px, color, sym }: { id: string; px: number; color: str
     const [copied, setCopied] = useState(false)
     const exportJson = () => {
         if (!plan) return
-        const json = JSON.stringify(plan.config, (_, v) => (v && typeof v === 'object' && 'words' in v ? v.toString() : v), 2)
-        navigator.clipboard.writeText(json)
+        navigator.clipboard.writeText(configToJson(plan.config))
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
     }

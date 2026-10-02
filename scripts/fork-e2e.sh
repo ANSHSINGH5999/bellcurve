@@ -30,3 +30,4 @@ VAL=$!
 trap 'kill $VAL 2>/dev/null' EXIT
 until solana cluster-version -ul >/dev/null 2>&1; do sleep 1; done
 tsx scripts/fork-e2e.ts
+[ -n "${KEEP:-}" ] && echo "validator kept running (KEEP=1)" && wait $VAL

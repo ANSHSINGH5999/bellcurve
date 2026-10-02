@@ -24,7 +24,7 @@ export default function CurveChart({ points, color = '#34d399', marker }: { poin
                         labelFormatter={(v) => `${v}% of supply sold`}
                         formatter={(v, k) => [k === 'mcap' ? fmtUsd(Number(v), 0) : String(v), k === 'mcap' ? 'Market cap' : String(k)]}
                     />
-                    <Area type="monotone" dataKey="mcap" stroke={color} strokeWidth={2} fill="url(#cg)" />
+                    <Area type="monotone" dataKey="mcap" stroke={color} strokeWidth={2} fill="url(#cg)" isAnimationActive={false} />
                     {markerPt && <ReferenceDot x={markerPt.x} y={markerPt.mcap} r={5} fill="#fff" stroke={color} />}
                 </AreaChart>
             </ResponsiveContainer>

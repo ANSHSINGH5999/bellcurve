@@ -219,3 +219,15 @@ export function simulateCurve(config: ConfigParameters, stockDecimals: number, u
     }
     return pts
 }
+
+/** ConfigParameters as JSON with every BN as a decimal string. (JSON.stringify calls BN.toJSON, which is hex, before any replacer sees it.) */
+export function configToJson(config: ConfigParameters): string {
+    return JSON.stringify(
+        config,
+        function (this: Record<string, unknown>, key, value) {
+            const raw = this[key]
+            return BN.isBN(raw) ? raw.toString(10) : value
+        },
+        2
+    )
+}

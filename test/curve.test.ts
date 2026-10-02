@@ -3,7 +3,7 @@ import { validateConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { Keypair } from '@solana/web3.js'
 
 const KP = Keypair.generate().publicKey
-import { buildLaunchPlan, LaunchPlanError } from '../src/lib/curve'
+import { buildLaunchPlan, configToJson, LaunchPlanError } from '../src/lib/curve'
 import { PRESETS } from '../src/lib/presets'
 
 // Representative prices (USD per raw whole xStock) spanning cheap → expensive stocks
@@ -39,5 +39,13 @@ describe('BellCurve launch engine', () => {
         const pricey = buildLaunchPlan({ preset: PRESETS[0], usdPerRawStock: 1200, stockDecimals: 8 })
         expect(cheap.thresholdStock / pricey.thresholdStock).toBeCloseTo(10, 0)
         expect(cheap.thresholdUsd).toBeCloseTo(pricey.thresholdUsd, -2)
+    })
+
+    it('exports ConfigParameters JSON with BN fields as decimal strings, not BN.toJSON hex', () => {
+        const plan = buildLaunchPlan({ preset: PRESETS[0], usdPerRawStock: 232, stockDecimals: 8 })
+        const json = JSON.parse(configToJson(plan.config))
+        expect(json.migrationQuoteThreshold).toBe(plan.config.migrationQuoteThreshold.toString(10))
+        expect(json.sqrtStartPrice).toBe(plan.config.sqrtStartPrice.toString(10))
+        expect(json.curve[0].liquidity).toBe(plan.config.curve[0].liquidity.toString(10))
     })
 })

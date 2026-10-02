@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useConnection } from '@solana/wallet-adapter-react'
 import { getPriceFromSqrtPrice } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { listPlatformLaunches } from '@/lib/dbc'
+import { fetchTokenMeta, type TokenMeta } from '@/lib/metadata'
 import { fmtUsd, useUsdPrices } from '@/lib/hooks'
 import { XSTOCKS, getStock } from '@/lib/stocks'
 
@@ -14,6 +15,7 @@ export default function Home() {
     const prices = useUsdPrices(XSTOCKS.map((s) => s.mint))
     const [rows, setRows] = useState<Row[] | null>(null)
     const [err, setErr] = useState('')
+    const [metas, setMetas] = useState<Record<string, TokenMeta | null>>({})
 
     useEffect(() => {
         listPlatformLaunches(connection)
@@ -38,6 +40,10 @@ export default function Home() {
                 setRows([])
             })
     }, [connection])
+
+    useEffect(() => {
+        rows?.forEach((r) => fetchTokenMeta(connection, r.mint).then((m) => setMetas((prev) => ({ ...prev, [r.mint]: m })), () => {}))
+    }, [connection, rows])
 
     return (
         <div className="space-y-10">
@@ -95,7 +101,10 @@ export default function Home() {
                         return (
                             <Link key={r.mint} href={`/t/${r.mint}?pool=${r.pool}`} className="card block p-4 hover:border-accent">
                                 <div className="flex justify-between text-sm">
-                                    <span className="mono">{r.mint.slice(0, 4)}…{r.mint.slice(-4)}</span>
+                                    <span className="truncate font-semibold">
+                                        {metas[r.mint]?.name ?? <span className="mono font-normal">{r.mint.slice(0, 4)}…{r.mint.slice(-4)}</span>}
+                                        {metas[r.mint]?.symbol && <span className="mono font-normal text-muted"> ${metas[r.mint]!.symbol}</span>}
+                                    </span>
                                     <span style={{ color: s?.color }}>{s?.symbol}</span>
                                 </div>
                                 <div className="mono mt-1 text-lg">{fmtUsd(r.priceStock * usd * 1e9, 0)}</div>

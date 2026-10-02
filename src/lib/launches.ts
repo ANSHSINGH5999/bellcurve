@@ -39,12 +39,18 @@ const getTx = (conn: Connection, sig: string) => conn.getTransaction(sig, { maxS
 const configsBySig = new Map<string, { config: PublicKey; quoteMint: PublicKey }[]>()
 const launchByConfig = new Map<string, LaunchRef>()
 
+/** Bound per request: anyone can spam a public wallet with dust txs, and each uncached one costs an RPC call. */
+const MAX_NEW_TX_PER_REQUEST = 150
+
 export async function findLaunches(conn: Connection, platform: PublicKey): Promise<LaunchRef[]> {
     // sequential on purpose: free RPCs rate-limit bursts of getTransaction
     const configs: { config: PublicKey; quoteMint: PublicKey }[] = []
+    let budget = MAX_NEW_TX_PER_REQUEST
     for (const s of await allSignatures(conn, platform)) {
         let found = configsBySig.get(s.signature)
         if (!found) {
+            if (budget-- <= 0) continue // picked up by a later request; results are cached
+
             const tx = await getTx(conn, s.signature)
             if (!tx) continue
             found = dbcInstructions(tx)
