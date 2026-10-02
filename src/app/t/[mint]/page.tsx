@@ -7,7 +7,7 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import { getPriceFromSqrtPrice, type ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import CurveChart from '@/components/CurveChart'
 import { simulateCurve, TOTAL_SUPPLY } from '@/lib/curve'
-import { buildSwapTx, confirmOrThrow, dbcClient, loadPoolByMint, quoteSwap, type PoolView } from '@/lib/dbc'
+import { buildSwapTx, confirmOrThrow, dbcClient, loadPoolByMint, quoteSwap, withPriorityFee, type PoolView } from '@/lib/dbc'
 import { explorer } from '@/lib/env'
 import { fmtUsd, useStockQuote } from '@/lib/hooks'
 import { fetchTokenImage, fetchTokenMeta, type TokenMeta } from '@/lib/metadata'
@@ -286,6 +286,7 @@ function ClaimPanel({ view, amount, symbol, onDone }: { view: PoolView; amount: 
             })
             tx.feePayer = wallet.publicKey
             tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
+            await withPriorityFee(connection, tx)
             const sig = await connection.sendRawTransaction((await wallet.signTransaction(tx)).serialize())
             await confirmOrThrow(connection, sig)
             setMsg('✅ Claimed')

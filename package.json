@@ -13,6 +13,8 @@
     "fork:e2e": "bash scripts/fork-e2e.sh"
   },
   "dependencies": {
+    "@meteora-ag/cp-amm-sdk": "1.4.5",
+    "@meteora-ag/dlmm": "1.9.14",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.13",
     "@solana/spl-token": "^0.4.15",
     "@solana/wallet-adapter-base": "^0.9.28",

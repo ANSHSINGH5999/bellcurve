@@ -1,5 +1,5 @@
 import BN from 'bn.js'
-import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js'
+import { ComputeBudgetProgram, Connection, Keypair, PublicKey, Transaction, type TransactionInstruction } from '@solana/web3.js'
 import {
     DynamicBondingCurveClient,
     getCurrentPoint,
@@ -19,6 +19,28 @@ export const PLATFORM_FEE_CLAIMER = new PublicKey(
 export async function confirmOrThrow(connection: Connection, sig: string) {
     const { value } = await connection.confirmTransaction(sig, 'confirmed')
     if (value.err) throw new Error(`Transaction failed on-chain (${JSON.stringify(value.err)}) — ${sig.slice(0, 10)}…`)
+}
+
+/**
+ * Busy mainnet drops unprioritized txs. Adds a compute-unit price (recent median, clamped) and, if the SDK
+ * didn't set one, a compute-unit limit sized by simulation. Max cost at the cap is ~0.0004 SOL per tx.
+ * Must run before signing.
+ */
+export async function withPriorityFee(connection: Connection, tx: Transaction, fallbackUnits = 400_000) {
+    const has = (code: number) => tx.instructions.some((ix) => ix.programId.equals(ComputeBudgetProgram.programId) && ix.data[0] === code)
+    const pre: TransactionInstruction[] = []
+    if (!has(2)) {
+        const sim = await connection.simulateTransaction(tx).catch(() => null)
+        const used = sim && !sim.value.err ? sim.value.unitsConsumed : undefined
+        pre.push(ComputeBudgetProgram.setComputeUnitLimit({ units: used ? Math.ceil(used * 1.2) + 10_000 : fallbackUnits }))
+    }
+    if (!has(3)) {
+        const fees = (await connection.getRecentPrioritizationFees().catch(() => [])).map((f) => f.prioritizationFee).filter((f) => f > 0).sort((a, b) => a - b)
+        const median = fees.length ? fees[Math.floor(fees.length / 2)] : 0
+        pre.push(ComputeBudgetProgram.setComputeUnitPrice({ microLamports: Math.min(Math.max(median, 50_000), 1_000_000) }))
+    }
+    tx.instructions.unshift(...pre)
+    return tx
 }
 
 export const dbcClient = (connection: Connection) => new DynamicBondingCurveClient(connection, 'confirmed')
@@ -84,6 +106,8 @@ export async function buildLaunchTx(args: {
         tx.recentBlockhash = blockhash
         tx.feePayer = args.creator
     }
+    // tx 2 can't be simulated before tx 1 creates the config, so it uses the fallback limit
+    await Promise.all(txs.map((tx) => withPriorityFee(args.connection, tx)))
     txs[0].partialSign(configKeypair)
     txs[1].partialSign(baseMintKeypair)
 
@@ -153,7 +177,7 @@ export async function buildSwapTx(connection: Connection, owner: PublicKey, view
     const { blockhash } = await connection.getLatestBlockhash('confirmed')
     tx.recentBlockhash = blockhash
     tx.feePayer = owner
-    return tx
+    return withPriorityFee(connection, tx)
 }
 
 /** All launches made through this platform (configs whose fee claimer is the platform wallet), via /api/launches. */
