@@ -2,7 +2,17 @@
 
 **The first launchpad built on Meteora's whole stack: DBC → DAMM v2 → DLMM.** Tokens launch on a Dynamic Bonding Curve quoted in a tokenized stock (NVDAx, SPYx, TSLAx…), graduate into DAMM v2, and every launch gets a **Conviction Pool** on DLMM where holders publicly commit, on-chain, to how they will trade.
 
-> Submission for *Best use of Meteora's Dynamic Bonding Curve*, Colosseum Crypto World's Fair sidetrack. Live: https://bellcurve-launch.vercel.app
+> Submission for *Best use of Meteora's Dynamic Bonding Curve*, Colosseum Crypto World's Fair sidetrack.
+> **Mainnet:** https://bellcurve-launch.vercel.app · **Try it free (devnet):** https://bellcurve-devnet.vercel.app
+
+### Try it free in 5 minutes (devnet, test tokens with no value)
+
+1. Switch your wallet to devnet (Phantom: Settings → Developer Settings → Testnet Mode → Solana Devnet) and open https://bellcurve-devnet.vercel.app.
+2. Press **Get test funds**: 0.3 test SOL + 20 mNVDAx (a mock 8-decimal Token-2022 NVDAx).
+3. **Launch** with the **Devnet Demo** curve (graduates at ~5 mNVDAx), then open the token's **Conviction Pool** and commit a sell wall.
+4. Buy the rest of the curve, press **Graduate to DAMM v2**, and keep trading in the graduated pool.
+
+The whole run costs ~0.19 test SOL (measured with a fresh wallet funded only by the faucet). The biggest item is one-time DLMM bin-array rent (0.0714 SOL), which the app shows before you sign.
 
 ## The problem: graduations don't mean demand
 

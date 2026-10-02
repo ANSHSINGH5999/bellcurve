@@ -55,7 +55,8 @@
 
 **Links:**
 - GitHub: https://github.com/ANSHSINGH5999/bellcurve
-- Live app: https://bellcurve-launch.vercel.app
+- Live app (mainnet): https://bellcurve-launch.vercel.app
+- Try it free (devnet, faucet built in): https://bellcurve-devnet.vercel.app
 - Problem data: Litmus, https://github.com/omreor/litmus (98.9% of DBC graduations uncontested)
 - Demo video: TODO
 - Example mainnet token: TODO (after the first real NVDAx launch)

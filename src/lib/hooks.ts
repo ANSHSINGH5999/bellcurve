@@ -23,7 +23,8 @@ export function useUsdPrices(mints: string[], refreshMs = 20_000) {
             clearInterval(t)
         }
     }, [key, refreshMs])
-    return prices
+    // the devnet mock stock has no market price: pretend it trades like NVDA (~$200) so the USD maths is demo-able
+    return CLUSTER === 'devnet' && DEVNET_MOCK_STOCK.mint ? { ...prices, [DEVNET_MOCK_STOCK.mint]: 200 } : prices
 }
 
 /** Live USD price per *raw* stock unit (Jupiter UI price × ScaledUiAmount multiplier) */
@@ -35,8 +36,7 @@ export function useStockQuote(mint: string | undefined) {
         if (!mint) return
         readScaledMultiplier(connection, mint).then(setScaled)
     }, [connection, mint])
-    // devnet mock stock has no market price: pretend it trades like NVDA (~$200) so the USD maths is demo-able
-    const usdPerUi = !mint ? undefined : CLUSTER === 'devnet' && mint === DEVNET_MOCK_STOCK.mint ? 200 : prices[mint]
+    const usdPerUi = mint ? prices[mint] : undefined
     return {
         usdPerUi,
         multiplier: scaled.multiplier,
