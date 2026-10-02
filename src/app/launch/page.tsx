@@ -69,7 +69,7 @@ export default function LaunchPage() {
             if (uri.length > 200) throw new Error('Image URL too long for on-chain metadata (max ~120 chars). Use a shorter link.')
             const firstBuyRaw =
                 firstBuy && Number(firstBuy) > 0 ? new BN(Math.floor((Number(firstBuy) / q.multiplier) * 10 ** stock.decimals)) : undefined
-            const { txs, baseMintKeypair } = await buildLaunchTx({
+            const { txs, baseMintKeypair, pool } = await buildLaunchTx({
                 connection,
                 creator: wallet.publicKey,
                 quoteMint: stock.mint,
@@ -87,7 +87,7 @@ export default function LaunchPage() {
                 const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false })
                 await connection.confirmTransaction(sig, 'confirmed')
             }
-            router.push(`/t/${baseMintKeypair.publicKey.toBase58()}`)
+            router.push(`/t/${baseMintKeypair.publicKey.toBase58()}?pool=${pool.toBase58()}`)
         } catch (e) {
             setStatus(`❌ ${(e as Error).message}`)
         } finally {

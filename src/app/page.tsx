@@ -7,7 +7,7 @@ import { listPlatformLaunches } from '@/lib/dbc'
 import { fmtUsd, useUsdPrices } from '@/lib/hooks'
 import { XSTOCKS, getStock } from '@/lib/stocks'
 
-type Row = { mint: string; quote: string; priceStock: number; progress: number; migrated: boolean }
+type Row = { mint: string; pool: string; quote: string; priceStock: number; progress: number; migrated: boolean }
 
 export default function Home() {
     const { connection } = useConnection()
@@ -24,6 +24,7 @@ export default function Home() {
                         const dec = getStock(quote)?.decimals ?? 8
                         return {
                             mint: p.account.poolState.baseMint.toBase58(),
+                            pool: p.publicKey.toBase58(),
                             quote,
                             priceStock: getPriceFromSqrtPrice(p.account.poolState.sqrtPrice, p.config.tokenDecimal, dec).toNumber(),
                             progress: Number(p.account.poolState.quoteReserve.toString()) / Math.max(1, Number(p.config.migrationQuoteThreshold.toString())),
@@ -92,7 +93,7 @@ export default function Home() {
                         const s = getStock(r.quote)
                         const usd = s ? (prices[s.mint] ?? 0) : 0
                         return (
-                            <Link key={r.mint} href={`/t/${r.mint}`} className="card block p-4 hover:border-accent">
+                            <Link key={r.mint} href={`/t/${r.mint}?pool=${r.pool}`} className="card block p-4 hover:border-accent">
                                 <div className="flex justify-between text-sm">
                                     <span className="mono">{r.mint.slice(0, 4)}…{r.mint.slice(-4)}</span>
                                     <span style={{ color: s?.color }}>{s?.symbol}</span>

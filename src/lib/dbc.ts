@@ -96,9 +96,14 @@ export type PoolView = {
     progress: number // 0..1 toward graduation
 }
 
-export async function loadPoolByMint(connection: Connection, baseMint: string): Promise<PoolView | null> {
+/** `poolHint` (from the launch link) skips getPoolByBaseMint, a getProgramAccounts scan that many public RPCs block. */
+export async function loadPoolByMint(connection: Connection, baseMint: string, poolHint?: string): Promise<PoolView | null> {
     const client = dbcClient(connection)
-    const acc = await client.state.getPoolByBaseMint(baseMint)
+    const hinted = poolHint ? await client.state.getPool(poolHint) : null
+    const acc =
+        hinted && hinted.poolState.baseMint.toBase58() === baseMint
+            ? { publicKey: new PublicKey(poolHint!), account: hinted }
+            : await client.state.getPoolByBaseMint(baseMint)
     if (!acc) return null
     const config = await client.state.getPoolConfig(acc.account.poolState.config)
     if (!config) return null

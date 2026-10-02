@@ -1,5 +1,6 @@
 'use client'
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import BN from 'bn.js'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
@@ -15,13 +16,14 @@ import { getStock } from '@/lib/stocks'
 
 export default function TokenPage({ params }: { params: Promise<{ mint: string }> }) {
     const { mint } = use(params)
+    const poolHint = useSearchParams().get('pool') ?? undefined
     const { connection } = useConnection()
     const wallet = useWallet()
     const { setVisible } = useWalletModal()
     const [view, setView] = useState<PoolView | null | undefined>(undefined)
     const [meta, setMeta] = useState<TokenMeta | null>(null)
 
-    const refresh = useCallback(() => loadPoolByMint(connection, mint).then(setView).catch(() => setView(null)), [connection, mint])
+    const refresh = useCallback(() => loadPoolByMint(connection, mint, poolHint).then(setView).catch(() => setView(null)), [connection, mint, poolHint])
     useEffect(() => {
         refresh()
         fetchTokenMeta(connection, mint).then(setMeta).catch(() => {})
