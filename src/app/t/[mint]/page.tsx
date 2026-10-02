@@ -1,10 +1,12 @@
 'use client'
-import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import BN from 'bn.js'
+import type { PublicKey } from '@solana/web3.js'
 import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import { getPriceFromSqrtPrice, type ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import ConvictionPanel from '@/components/ConvictionPanel'
 import CurveChart from '@/components/CurveChart'
 import { simulateCurve, TOTAL_SUPPLY } from '@/lib/curve'
 import { buildSwapTx, confirmOrThrow, dbcClient, loadPoolByMint, quoteSwap, withPriorityFee, type PoolView } from '@/lib/dbc'
@@ -14,6 +16,7 @@ import { fetchTokenImage, fetchTokenMeta, type TokenMeta } from '@/lib/metadata'
 import { getPreset } from '@/lib/presets'
 import { getStock } from '@/lib/stocks'
 import { buildSolToStockTx, quoteSolToStock, type JupQuote } from '@/lib/zap'
+import { buildDammSwapTx, quoteDammSwap, successorPool, type DammQuote } from '@/lib/damm'
 
 export default function TokenPage({ params }: { params: Promise<{ mint: string }> }) {
     const { mint } = use(params)
@@ -119,6 +122,20 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
                     <Mini k={`${stock?.symbol} price`} v={fmtUsd(sq.usdPerUi)} />
                     <Mini k="Creator fees" v={`${derived.creatorFeeStock.toFixed(4)} ${stock?.symbol ?? ''}`} />
                 </div>
+
+                {stock && (
+                    <ConvictionPanel
+                        base={view.pool.poolState.baseMint}
+                        quote={view.config.quoteMint}
+                        symbol={meta?.symbol ? `$${meta.symbol}` : 'tokens'}
+                        stockSymbol={stock.symbol}
+                        baseDec={derived.baseDec}
+                        qDec={qDec}
+                        multiplier={sq.multiplier}
+                        usdPerRaw={usdPerRaw}
+                        marketPrice={derived.priceStock}
+                    />
+                )}
             </section>
 
             <section className="space-y-4">
@@ -156,6 +173,20 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
     const sell = side === 'sell'
     const viaSol = paySol && !sell
     const priceKey = view.pool.poolState.sqrtPrice.toString()
+    // after graduation the curve is closed: trade the DAMM v2 pool it migrated into
+    const migrated = !!view.pool.poolState.isMigrated
+    const dammPool = useMemo(() => (migrated ? successorPool(view) : null), [migrated, view])
+    const dammState = useRef<DammQuote['poolState'] | null>(null)
+    const quote = async (amountIn: BN) => {
+        if (!dammPool) return quoteSwap(connection, view, amountIn, sell, 100)
+        const q = await quoteDammSwap(connection, dammPool, amountIn, sell, 100)
+        dammState.current = q.poolState
+        return q
+    }
+    const build = (owner: PublicKey, amountIn: BN, min: BN, isSell: boolean) =>
+        dammPool && dammState.current
+            ? buildDammSwapTx(connection, owner, dammPool, dammState.current, amountIn, min, isSell)
+            : buildSwapTx(connection, owner, view, amountIn, min, isSell)
     const inDec = sell ? baseDec : viaSol ? 9 : qDec
     const outDec = sell ? qDec : baseDec
     // wallets show xStocks in UI units (raw × ScaledUiAmount multiplier); the curve trades raw units
@@ -176,7 +207,7 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
                     setJup(jq)
                     amountIn = new BN(jq.otherAmountThreshold)
                 }
-                const q = await quoteSwap(connection, view, amountIn, sell, 100)
+                const q = await quote(amountIn)
                 setOut({ out: new BN(q.outputAmount.toString()), min: new BN(q.minimumAmountOut.toString()), left: new BN(q.amountLeft.toString()) })
             } catch (e) {
                 setMsg((e as Error).message)
@@ -184,7 +215,7 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
         }, 300)
         return () => clearTimeout(t)
         // eslint-disable-next-line react-hooks/exhaustive-deps -- toRaw/view are covered by the listed deps (priceKey = pool price)
-    }, [amt, sell, viaSol, inDec, multiplier, connection, priceKey])
+    }, [amt, sell, viaSol, inDec, multiplier, connection, priceKey, dammPool])
 
     async function trade() {
         if (!wallet.publicKey || !wallet.signTransaction || !out) return
@@ -194,15 +225,15 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
             if (viaSol && jup && wallet.signAllTransactions) {
                 // one approval, two txs: Jupiter SOL -> stock, then the curve buy with the guaranteed minimum
                 const swapTx = await buildSolToStockTx(jup, wallet.publicKey)
-                const buyTx = await buildSwapTx(connection, wallet.publicKey, view, new BN(jup.otherAmountThreshold), out.min, false)
+                const buyTx = await build(wallet.publicKey, new BN(jup.otherAmountThreshold), out.min, false)
                 const [s1, s2] = await wallet.signAllTransactions([swapTx, buyTx] as (typeof swapTx | typeof buyTx)[])
                 setMsg(`Swapping SOL → ${stockSymbol}…`)
                 const sig1 = await connection.sendRawTransaction(s1.serialize())
                 await confirmOrThrow(connection, sig1)
-                setMsg('Buying on the curve…')
+                setMsg(dammPool ? 'Buying on DAMM v2…' : 'Buying on the curve…')
                 sig = await connection.sendRawTransaction(s2.serialize())
             } else {
-                const tx = await buildSwapTx(connection, wallet.publicKey, view, toRaw(Number(amt)), out.min, sell)
+                const tx = await build(wallet.publicKey, toRaw(Number(amt)), out.min, sell)
                 sig = await connection.sendRawTransaction((await wallet.signTransaction(tx)).serialize())
             }
             await confirmOrThrow(connection, sig)
@@ -214,21 +245,18 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
         }
     }
 
-    if (view.pool.poolState.isMigrated) {
-        const base = view.pool.poolState.baseMint.toBase58()
-        return (
-            <div className="card space-y-3 p-5">
-                <p className="text-sm">🎓 This curve graduated. The token now trades in its Meteora DAMM v2 pool, still paired with {stockSymbol}.</p>
-                <a className="btn btn-primary w-full text-center" href={`https://jup.ag/swap?sell=${view.config.quoteMint.toBase58()}&buy=${base}`} target="_blank" rel="noreferrer">
-                    Trade on Jupiter
-                </a>
-            </div>
-        )
-    }
-
     const outNum = out ? (Number(out.out.toString()) / 10 ** outDec) * (sell ? multiplier : 1) : 0
     return (
         <div className="card space-y-3 p-5">
+            {dammPool && (
+                <p className="text-xs text-muted">
+                    🎓 Graduated: trading in the Meteora DAMM v2 pool, still paired with {stockSymbol}. Also on{' '}
+                    <a className="underline" href={`https://jup.ag/swap?sell=${view.config.quoteMint.toBase58()}&buy=${view.pool.poolState.baseMint.toBase58()}`} target="_blank" rel="noreferrer">
+                        Jupiter
+                    </a>
+                    .
+                </p>
+            )}
             <div className="grid grid-cols-2 gap-2">
                 {(['buy', 'sell'] as const).map((s) => (
                     <button key={s} onClick={() => setSide(s)} className={`btn ${side === s ? (s === 'buy' ? 'btn-primary' : 'bg-danger text-black') : 'btn-ghost'}`}>

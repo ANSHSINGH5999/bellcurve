@@ -1,17 +1,17 @@
 # BellCurve: win plan for the Meteora DBC track
 
-**Prize pool:** 10k USDC, split 5k / 3k / 1.5k / 500 / … for 5 places. Separate discretionary infra grants go to AI/RWA DBC projects.
+**Prize pool:** 20k USDC across 5 places (10k / 5k / 3k / 1.5k / 500, per the listing). Separate discretionary infra grants go to AI/RWA DBC builders.
 **Deadline:** 13 Oct 2026, 12:29 PM IST (06:59 UTC). Winners are announced 31 Oct.
-**Competition:** 14 submissions as of 1 Oct.
+**Competition:** 60+ public repos in this track and Stocklana (2 Oct). Launch studios and stock-quoted launchpads are crowded; **none of the DBC launchpads we reviewed use DLMM**, which the listing explicitly asks for.
 
 ## How the judges score, and how BellCurve answers
 
 | Criterion | Our answer |
 |---|---|
-| Depth of Meteora integration | DBC end to end: custom xStock quote mint + TokenBadge, all three curve builders (market cap, 16-segment liquidity weights, two segments), exponential and linear fee schedulers, dynamic fee, min-fee creator first buy, `swap2` PartialFill, creator fee claims. Graduation into DAMM v2 with a custom fee, 60% permanently locked LP, and **Compounding Liquidity DAMM v2 pools** (Flat RWA preset). The whole lifecycle including `migrateToDammV2` is tested on cloned mainnet state. |
+| Depth of Meteora integration | **All three Meteora liquidity products in one flow**, which the listing asks for and none of the 60+ DBC entries we reviewed do: DBC (xStock quote mint + TokenBadge, all three curve builders, fee schedulers, min-fee first buy, `swap2` PartialFill, creator fees) → DAMM v2 (graduation with locked LP, **compounding-liquidity** pools for Flat RWA, in-app trading of the successor pool) → **DLMM Conviction Pools** (commitments as limit orders). Every stage is tested on cloned mainnet state. |
 | Technical execution | USD → equity engine handling the ScaledUiAmount multiplier, keeper-floor guard, and issuer-pause detection. 29 unit tests run against the SDK's own validator, plus `pnpm fork:e2e`: every preset's full lifecycle (launch → trade → claim → graduate to DAMM v2) on cloned **mainnet** state. The launch index needs no getProgramAccounts, so it runs on a free RPC. |
-| Originality & taste | Built to outlast the meme-stock meta. A token priced in shares has a natural benchmark, the stock itself, so BellCurve treats every launch as an **equity-relative asset**: the headline number is **alpha vs. the stock** (its return in share terms = outperformance vs. holding NVDA), and the **Flat RWA** curve (~1.6× price range, compounding DAMM v2 after graduation) fits revenue-share tokens, baskets and RWA wrappers rather than 100× memes. Stock-quoted DBC itself is the track's theme, so the edge is what's built on it: **alpha vs. the stock** (the token's return in share terms, i.e. outperformance vs. holding NVDA), **Buy with SOL** so non-holders can join, a dividend-correct USD → equity engine, and equity-native curve presets (Opening Bell, Flat RWA). |
-| Impact potential | Every launch creates organic xStock demand and a new DAMM v2 xStock pair: a new asset class of tokens priced relative to equities. It's also infrastructure: **`/api/presets`** serves any preset × any xStock as a ready, live-priced, dividend-adjusted DBC `ConfigParameters` (plus the TokenBadge), so other launchpads and trading terminals can plug in stock-paired launches with one HTTP call. |
+| Originality & taste | Built for what lasts after the meme-stock meta: **trust**. 98.9% of DBC graduations are uncontested (Litmus data), so a graduation proves nothing. Conviction Pools turn holder intent into public, enforceable DLMM limit orders ("I only sell above 3×", "I buy the dip to −30%") and score each launch on committed supply. Priced in shares, so every token also shows its **alpha vs. the stock**. |
+| Impact potential | A trust primitive any launchpad can adopt: the Conviction Pool is just a DLMM pair + limit orders, and the preset API (`/api/presets`) already serves live-priced, dividend-adjusted DBC configs to other launchpads and terminals. It also gives thin new markets real depth at stated prices, Meteora's "price discovery for thinly traded names". |
 | Traction / volume | **This is the gap to close.** It has to be live on mainnet with real users (plan below). |
 
 ## Day-by-day plan (do these in order)
@@ -37,25 +37,26 @@
 
 ## Demo video script (2.5 min)
 
-1. **0:00 Hook.** "Every launchpad prices tokens in SOL. BellCurve prices them in NVIDIA."
-2. **0:15 Problem.** Narrative and RWA tokens are bets relative to equities, but they're quoted in SOL. Creators farm their own token.
-3. **0:35 Launch flow.** Pick NVDAx, pick a preset, and show the live curve and the keeper-floor check. Point out that the dividend multiplier is applied.
-4. **1:15 On-chain.** Show the two txs on Solscan: a config with quote = NVDAx plus TokenBadge, then the pool plus the unsnipeable first buy.
-5. **1:40 Trade + earn.** Buy, sell, then the creator claims fees *in NVDAx*.
-6. **2:05 Presets page.** Show the JSON export and explain that any launchpad can use these configs.
-7. **2:20 Traction + ask.** Show the number of launches, wallets and volume, then the roadmap.
+1. **0:00 Hook.** "98.9% of Meteora DBC graduations were uncontested: no real competing buyers. A graduation proves nothing. BellCurve makes conviction verifiable."
+2. **0:15 Launch.** Pick NVDAx, pick a preset, show the live curve in USD and in shares, and the keeper-floor check. Launch (2 txs) with a creator first buy.
+3. **0:45 Trade.** Buy with plain SOL (Jupiter → NVDAx → curve, one approval). Show "alpha vs. NVDA".
+4. **1:05 Conviction.** Open the Conviction Pool (DLMM). Creator commits a sell wall at 2×–5×; a second wallet commits support. Show the Conviction Score and the depth ladder, then the limit orders on Solscan.
+5. **1:40 Graduation.** Show `pnpm fork:e2e`: every preset graduates into DAMM v2 and keeps trading in-app; the wall fills on a DLMM buy and the creator withdraws proceeds. Mention the reversed-pair test.
+6. **2:05 For builders.** `/api/presets?id=flat-rwa&stock=NVDAx`: a live, dividend-adjusted DBC config any launchpad can use.
+7. **2:20 Traction + ask.** Launches, wallets, committed supply on mainnet. Roadmap.
 
 ## Submission text (paste and edit)
 
-**Title:** BellCurve: token launches priced in equities
+**Title:** BellCurve: conviction you can verify, on Meteora's full stack
 
-**One-liner:** A Meteora DBC launchpad where every bonding curve is quoted in a tokenized stock (SPYx, NVDAx, TSLAx…), so buyers pay in stock, creators earn stock, and every graduation seeds a DAMM v2 xStock pool.
+**One-liner:** Stock-quoted token launches on Meteora DBC that graduate into DAMM v2, with a DLMM Conviction Pool where holders publicly commit, as limit orders, to sell only above a price or to buy the dip.
 
-**What it does:** BellCurve creates a dedicated DBC config per launch with an xStock as the quote mint, passing the mint's DBC TokenBadge. A USD → equity curve engine converts market-cap targets into raw stock units using live Jupiter prices and each xStock's ScaledUiAmount dividend multiplier. It enforces Meteora's $750 keeper floor so every curve auto-graduates to DAMM v2. Five presets ship with it, covering the flat, exponential and long curves the track asks for: an exponential anti-snipe "Opening Bell", a near-flat "Flat RWA" curve that graduates into a compounding-liquidity DAMM v2 pool, and a two-segment "Long Curve". Each one is served by a public API (`/api/presets?id=flat-rwa&stock=NVDAx`) as a ready, live-priced DBC config that other launchpads can use directly. Anyone can buy with plain SOL (Jupiter routes SOL → xStock, then the curve buy, in one wallet approval), and the token page shows each token's return vs. just holding the stock. Creators' first buys land in the creation tx, fees are paid in stock, and 60% of graduated LP is permanently locked. Buys use DBC's PartialFill swap mode, so the graduating buy can never revert. The full lifecycle (launch → trade → claim → migrate to DAMM v2) is tested for all five presets against real mainnet program and NVDAx state.
+**What it does:** 98.9% of DBC graduations are uncontested, so a graduation says nothing about real demand. BellCurve launches tokens on a DBC curve quoted in a tokenized stock (NVDAx, SPYx…), using a USD→stock engine that applies each xStock's ScaledUiAmount dividend multiplier and enforces Meteora's $750 keeper floor so curves auto-graduate. Graduation goes into DAMM v2 with 60% of LP permanently locked (compounding-liquidity pools for the Flat RWA preset), and the app keeps trading the successor pool in-app. Next to every launch sits a **Conviction Pool** on DLMM: holders commit sell walls ("only above 3×") and support ("buy to −30%") as DLMM limit orders, and the token page leads with the share of supply committed above market plus a live depth ladder. Anyone can buy with plain SOL via Jupiter. Five equity-native presets (flat, exponential anti-snipe, long) are served live by a public API for other launchpads. The whole flow, including the Conviction Pool and a reversed-pair edge case, is tested on cloned mainnet state with the real DBC, DAMM v2 and DLMM programs and NVDAx TokenBadges.
 
 **Links:**
 - GitHub: https://github.com/ANSHSINGH5999/bellcurve
 - Live app: https://bellcurve-launch.vercel.app
+- Problem data: Litmus, https://github.com/omreor/litmus (98.9% of DBC graduations uncontested)
 - Demo video: TODO
 - Example mainnet token: TODO (after the first real NVDAx launch)
 - Proof: README "Proof" section (devnet tx signatures) and `pnpm fork:e2e`, which runs every preset on cloned mainnet state (real DBC + DAMM v2 programs, real NVDAx mint and TokenBadges) from launch through creator fee claim to graduation into DAMM v2.

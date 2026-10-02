@@ -49,13 +49,14 @@ export default function Home() {
         <div className="space-y-10">
             <section className="grid items-center gap-8 lg:grid-cols-2">
                 <div className="space-y-4">
-                    <span className="tag">Meteora DBC × DAMM v2 × xStocks</span>
+                    <span className="tag">Meteora DBC × DAMM v2 × DLMM · priced in xStocks</span>
                     <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-                        Launch tokens priced in <span className="text-accent">equities</span>, not SOL.
+                        Conviction you can <span className="text-accent">verify</span>.
                     </h1>
                     <p className="text-muted">
-                        BellCurve is a launchpad where every bonding curve is quoted in a tokenized stock — SPYx, NVDAx, TSLAx and more. Buyers pay in
-                        stock, creators earn stock, and every graduated pool deepens on-chain equity liquidity on Meteora DAMM v2.
+                        98.9% of Meteora DBC graduations were uncontested, with no real competing buyers (Litmus data), so a graduation proves nothing. BellCurve launches tokens
+                        priced in tokenized stocks (NVDAx, SPYx…), graduates them into Meteora DAMM v2, and gives every launch a Conviction Pool on DLMM where
+                        holders publicly commit, as limit orders, to sell only above a price or to buy the dip.
                     </p>
                     <div className="flex gap-3">
                         <Link href="/launch" className="btn btn-primary">Launch a token</Link>
@@ -74,8 +75,8 @@ export default function Home() {
 
             <section className="grid gap-4 sm:grid-cols-3">
                 {[
-                    ['Equity-denominated curves', 'Your token’s price is literally “X shares of NVDA”. USD targets are converted live using Jupiter prices and each xStock’s dividend multiplier.'],
-                    ['Creators earn stock', 'All curve and post-graduation fees are collected in the quote asset — creators accumulate SPYx/NVDAx instead of dumping their own token.'],
+                    ['Conviction Pools', 'Sell walls (“only above 3×”) and support (“buy to −30%”) as Meteora DLMM limit orders. Every launch is scored on the share of supply committed above market.'],
+                    ['Priced in shares', 'Your token’s price is literally “X shares of NVDA”, so every launch shows its alpha vs. the stock. Creators earn fees in equity, not their own token.'],
                     ['Graduates to DAMM v2', 'Thresholds are enforced above Meteora’s $750 keeper floor, so every curve auto-migrates. 60% of LP is permanently locked.'],
                 ].map(([t, d]) => (
                     <div key={t} className="card p-5">
