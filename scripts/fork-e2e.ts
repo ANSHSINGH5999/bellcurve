@@ -39,7 +39,7 @@ async function lifecycle(presetId: string) {
         plan,
         name: 'Fork Test',
         symbol: 'FORK',
-        uri: `https://bellcurve.vercel.app/api/meta?n=Fork&s=FORK&q=NVDAx&p=${preset.id}`,
+        uri: `https://bellcurve-launch.vercel.app/api/meta?n=Fork&s=FORK&q=NVDAx&p=${preset.id}`,
         firstBuyRaw: new BN(10_000_000), // 0.1 NVDAx
     })
     for (const tx of txs) await send(tx)

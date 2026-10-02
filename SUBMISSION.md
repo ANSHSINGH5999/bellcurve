@@ -55,7 +55,7 @@
 
 **Links:**
 - GitHub: https://github.com/ANSHSINGH5999/bellcurve
-- Live app: https://bellcurve.vercel.app
+- Live app: https://bellcurve-launch.vercel.app
 - Demo video: TODO
 - Example mainnet token: TODO (after the first real NVDAx launch)
 - Proof: README "Proof" section (devnet tx signatures) and `pnpm fork:e2e`, which runs every preset on cloned mainnet state (real DBC + DAMM v2 programs, real NVDAx mint and TokenBadges) from launch through creator fee claim to graduation into DAMM v2.

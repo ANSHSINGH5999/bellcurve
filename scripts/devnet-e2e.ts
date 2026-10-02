@@ -61,7 +61,7 @@ async function main() {
             baseMint: baseMint.publicKey,
             name: 'BellCurve Devnet Test',
             symbol: 'SCDT',
-            uri: 'https://bellcurve.vercel.app/api/meta?n=BellCurve%20Devnet%20Test&s=SCDT&q=mNVDAx&p=' + PRESET,
+            uri: 'https://bellcurve-launch.vercel.app/api/meta?n=BellCurve%20Devnet%20Test&s=SCDT&q=mNVDAx&p=' + PRESET,
             poolCreator: payer.publicKey,
         },
         firstBuyParam: {
