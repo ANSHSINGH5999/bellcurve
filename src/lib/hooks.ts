@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useConnection } from '@solana/wallet-adapter-react'
 import { readScaledMultiplier } from './price'
+import { CLUSTER } from './env'
+import { DEVNET_MOCK_STOCK } from './stocks'
 
 export function useUsdPrices(mints: string[], refreshMs = 20_000) {
     const [prices, setPrices] = useState<Record<string, number>>({})
@@ -33,7 +35,8 @@ export function useStockQuote(mint: string | undefined) {
         if (!mint) return
         readScaledMultiplier(connection, mint).then(setScaled)
     }, [connection, mint])
-    const usdPerUi = mint ? prices[mint] : undefined
+    // devnet mock stock has no market price: pretend it trades like NVDA (~$200) so the USD maths is demo-able
+    const usdPerUi = !mint ? undefined : CLUSTER === 'devnet' && mint === DEVNET_MOCK_STOCK.mint ? 200 : prices[mint]
     return {
         usdPerUi,
         multiplier: scaled.multiplier,

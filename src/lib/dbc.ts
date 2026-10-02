@@ -3,6 +3,7 @@ import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js'
 import {
     DynamicBondingCurveClient,
     getCurrentPoint,
+    SwapMode,
     type PoolConfig,
     type VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
@@ -111,22 +112,27 @@ export async function loadPoolByMint(connection: Connection, baseMint: string): 
 export async function quoteSwap(connection: Connection, view: PoolView, amountIn: BN, sell: boolean, slippageBps = 100) {
     const client = dbcClient(connection)
     const currentPoint = await getCurrentPoint(connection, view.config.activationType)
-    return client.pool.swapQuote({
+    // PartialFill: a buy larger than what's left on the curve fills up to graduation and leaves the rest unspent,
+    // instead of reverting with "Insufficient Liquidity" — so anyone can make the graduating buy
+    const q = client.pool.swapQuote2({
         virtualPool: view.pool,
         config: view.config,
         swapBaseForQuote: sell,
+        swapMode: SwapMode.PartialFill,
         amountIn,
         slippageBps,
         hasReferral: false,
         eligibleForFirstSwapWithMinFee: false,
         currentPoint,
     })
+    return { outputAmount: q.outputAmount, minimumAmountOut: q.minimumAmountOut!, amountLeft: q.amountLeft }
 }
 
 export async function buildSwapTx(connection: Connection, owner: PublicKey, view: PoolView, amountIn: BN, minOut: BN, sell: boolean) {
-    const tx = await dbcClient(connection).pool.swap({
+    const tx = await dbcClient(connection).pool.swap2({
         owner,
         pool: view.address,
+        swapMode: SwapMode.PartialFill,
         amountIn,
         minimumAmountOut: minOut,
         swapBaseForQuote: sell,

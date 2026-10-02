@@ -36,8 +36,7 @@ export default function LaunchPage() {
     const preset = getPreset(presetId)
     const prices = useUsdPrices(STOCKS.map((s) => s.mint))
     const q = useStockQuote(stock.mint)
-    // devnet mock has no market price: pretend it trades like NVDA so the USD maths is demo-able
-    const usdPerRaw = q.usdPerRaw ?? (CLUSTER === 'devnet' ? 200 : undefined)
+    const usdPerRaw = q.usdPerRaw
 
     const plan: LaunchPlan | { error: string } | null = useMemo(() => {
         if (!usdPerRaw) return null

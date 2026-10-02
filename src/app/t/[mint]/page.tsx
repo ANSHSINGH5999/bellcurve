@@ -98,7 +98,7 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
             </section>
 
             <section className="space-y-4">
-                <TradePanel view={view} stockSymbol={stock?.symbol ?? 'quote'} qDec={qDec} baseDec={derived.baseDec} usdPerRaw={usdPerRaw} paused={sq.paused} onDone={refresh} />
+                <TradePanel view={view} stockSymbol={stock?.symbol ?? 'quote'} qDec={qDec} baseDec={derived.baseDec} usdPerRaw={usdPerRaw} multiplier={sq.multiplier} paused={sq.paused} onDone={refresh} />
                 {isCreator && (
                     <ClaimPanel view={view} amount={derived.creatorFeeStock} symbol={stock?.symbol ?? ''} onDone={refresh} />
                 )}
@@ -119,36 +119,39 @@ function Mini({ k, v }: { k: string; v: string }) {
     )
 }
 
-function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; baseDec: number; usdPerRaw: number; paused: boolean; onDone: () => void }) {
-    const { view, stockSymbol, qDec, baseDec, usdPerRaw, paused, onDone } = props
+function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; baseDec: number; usdPerRaw: number; multiplier: number; paused: boolean; onDone: () => void }) {
+    const { view, stockSymbol, qDec, baseDec, usdPerRaw, multiplier, paused, onDone } = props
     const { connection } = useConnection()
     const wallet = useWallet()
     const [side, setSide] = useState<'buy' | 'sell'>('buy')
     const [amt, setAmt] = useState('')
-    const [out, setOut] = useState<{ out: BN; min: BN } | null>(null)
+    const [out, setOut] = useState<{ out: BN; min: BN; left: BN } | null>(null)
     const [msg, setMsg] = useState('')
     const sell = side === 'sell'
     const inDec = sell ? baseDec : qDec
     const outDec = sell ? qDec : baseDec
+    // wallets show xStocks in UI units (raw × ScaledUiAmount multiplier); the curve trades raw units
+    const toRaw = (n: number) => new BN(Math.floor((sell ? n : n / multiplier) * 10 ** inDec).toString())
 
     useEffect(() => {
         setOut(null)
+        setMsg('')
         const n = Number(amt)
         if (!(n > 0)) return
-        const amountIn = new BN(Math.floor(n * 10 ** inDec).toString())
+        const amountIn = toRaw(n)
         const t = setTimeout(() => {
             quoteSwap(connection, view, amountIn, sell, 100)
-                .then((q) => setOut({ out: new BN(q.outputAmount.toString()), min: new BN(q.minimumAmountOut.toString()) }))
+                .then((q) => setOut({ out: new BN(q.outputAmount.toString()), min: new BN(q.minimumAmountOut.toString()), left: new BN(q.amountLeft.toString()) }))
                 .catch((e) => setMsg(e.message))
         }, 250)
         return () => clearTimeout(t)
-    }, [amt, sell, inDec, connection, view])
+    }, [amt, sell, inDec, multiplier, connection, view])
 
     async function trade() {
         if (!wallet.publicKey || !wallet.signTransaction || !out) return
         try {
             setMsg('Confirm in wallet…')
-            const amountIn = new BN(Math.floor(Number(amt) * 10 ** inDec).toString())
+            const amountIn = toRaw(Number(amt))
             const tx = await buildSwapTx(connection, wallet.publicKey, view, amountIn, out.min, sell)
             const signed = await wallet.signTransaction(tx)
             const sig = await connection.sendRawTransaction(signed.serialize())
@@ -161,7 +164,7 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
         }
     }
 
-    const outNum = out ? Number(out.out.toString()) / 10 ** outDec : 0
+    const outNum = out ? (Number(out.out.toString()) / 10 ** outDec) * (sell ? multiplier : 1) : 0
     return (
         <div className="card space-y-3 p-5">
             <div className="grid grid-cols-2 gap-2">
@@ -176,8 +179,13 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
             <div className="text-sm text-muted">
                 You receive ≈ <span className="mono text-text">{out ? outNum.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'}</span>{' '}
                 {sell ? stockSymbol : 'tokens'}
-                {sell && out && <span className="mono"> ({fmtUsd(outNum * usdPerRaw)})</span>}
+                {sell && out && <span className="mono"> ({fmtUsd((outNum * usdPerRaw) / multiplier)})</span>}
             </div>
+            {!sell && out && out.left.gtn(0) && (
+                <p className="text-xs text-accent">
+                    This buy completes the curve 🎓 — only part of it is used; {((Number(out.left.toString()) / 10 ** qDec) * multiplier).toFixed(4)} {stockSymbol} stays in your wallet.
+                </p>
+            )}
             <button className="btn btn-primary w-full" disabled={!wallet.publicKey || !out || paused || view.pool.poolState.isMigrated === 1} onClick={trade}>
                 {view.pool.poolState.isMigrated ? 'Trade on Meteora DAMM v2' : paused ? `${stockSymbol} paused` : sell ? 'Sell' : 'Buy'}
             </button>

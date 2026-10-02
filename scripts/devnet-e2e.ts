@@ -11,14 +11,14 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import BN from 'bn.js'
-import { Connection, Keypair, sendAndConfirmTransaction, Transaction } from '@solana/web3.js'
+import { Connection, Keypair, PublicKey, sendAndConfirmTransaction } from '@solana/web3.js'
 import {
     createMint,
     getOrCreateAssociatedTokenAccount,
     mintTo,
     TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token'
-import { DynamicBondingCurveClient, getCurrentPoint } from '@meteora-ag/dynamic-bonding-curve-sdk'
+import { deriveDbcPoolAddress, DynamicBondingCurveClient, getCurrentPoint } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { buildLaunchPlan } from '../src/lib/curve'
 import { getPreset } from '../src/lib/presets'
 
@@ -55,7 +55,7 @@ async function main() {
         config: config.publicKey,
         feeClaimer: payer.publicKey,
         leftoverReceiver: payer.publicKey,
-        quoteMint: new (await import('@solana/web3.js')).PublicKey(stockMint),
+        quoteMint: new PublicKey(stockMint),
         ...plan.config,
         preCreatePoolParam: {
             baseMint: baseMint.publicKey,
@@ -77,9 +77,12 @@ async function main() {
     console.log('✓ pool + first buy', baseMint.publicKey.toBase58(), s2)
 
     // 4. buy again through the normal swap path, then sell half
-    const pool = await client.state.getPoolByBaseMint(baseMint.publicKey)
-    if (!pool) throw new Error('pool not found')
-    const cfg = (await client.state.getPoolConfig(pool.account.poolState.config))!
+    // derive the pool PDA instead of getPoolByBaseMint: that one is a getProgramAccounts scan, which public RPCs rate-limit
+    const poolAddress = deriveDbcPoolAddress(new PublicKey(stockMint), baseMint.publicKey, config.publicKey)
+    const poolState = await client.state.getPool(poolAddress)
+    if (!poolState) throw new Error('pool not found')
+    const pool = { publicKey: poolAddress, account: poolState }
+    const cfg = (await client.state.getPoolConfig(config.publicKey))!
     const point = await getCurrentPoint(conn, cfg.activationType)
     const buyIn = new BN(5).mul(new BN(10).pow(new BN(8)))
     const q = client.pool.swapQuote({
@@ -113,10 +116,9 @@ async function main() {
     })
     console.log('✓ sell half', await sendAndConfirmTransaction(conn, sellTx, [payer]))
 
-    const after = await client.state.getPoolByBaseMint(baseMint.publicKey)
-    console.log('✓ quote reserve', after!.account.poolState.quoteReserve.toString(), 'creator fee', after!.account.poolState.creatorQuoteFee.toString())
+    const after = await client.state.getPool(poolAddress)
+    console.log('✓ quote reserve', after!.poolState.quoteReserve.toString(), 'creator fee', after!.poolState.creatorQuoteFee.toString())
     console.log(`\nNEXT_PUBLIC_DEVNET_MOCK_STOCK_MINT=${stockMint}\nToken page: /t/${baseMint.publicKey.toBase58()}`)
-    void Transaction
 }
 
 main().catch((e) => {

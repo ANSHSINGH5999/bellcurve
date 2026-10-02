@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "devnet:e2e": "tsx scripts/devnet-e2e.ts"
+    "devnet:e2e": "tsx scripts/devnet-e2e.ts",
+    "fork:e2e": "bash scripts/fork-e2e.sh"
   },
   "dependencies": {
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.13",
