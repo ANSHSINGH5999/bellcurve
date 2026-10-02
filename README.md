@@ -27,6 +27,10 @@ Launchpads today price everything in SOL or USDC. That leaves out a whole class 
 | Issuer-pause awareness | Reads the xStock `PausableConfig`. If the issuer pauses the mint, launch and trade are disabled in the UI instead of failing on-chain. |
 | Safe graduation | 60% of graduated LP is permanently locked (partner 50 + creator 10), and token authority is immutable. |
 | Trading + fee claim | Buy and sell on the curve with SDK quotes and slippage protection. Buys use DBC's `PartialFill` swap mode, so an oversized final buy fills exactly to graduation and the unused stock stays in the buyer's wallet. Creators claim fees in stock from the token page. |
+| Buy with SOL | Most people don't hold xStocks. The trade panel routes SOL → xStock through Jupiter, then buys the curve with Jupiter's *guaranteed minimum* output: two txs, one wallet approval, and the curve buy can never be short of funds. |
+| Alpha vs. the stock | The curve is priced in shares, so the token's change in stock terms since launch is exactly its outperformance vs. holding the stock. The token page shows it as the headline number. |
+| Launch index on any RPC | `create_config` lists the platform wallet as `fee_claimer`, so `/api/launches` finds every launch from that wallet's signature history (edge-cached). No getProgramAccounts, which free RPCs block. |
+| Fails loudly | `confirmTransaction` resolves even for failed txs; every launch, trade and claim goes through `confirmOrThrow`, so the UI never reports a failed tx as success. |
 | Tests | 27 vitest cases: every preset × 5 price regimes passes the SDK's own `validateConfigParameters`, stays above the keeper floor, has a monotonic price, and raises ≈ the threshold. |
 
 ## Architecture
@@ -56,7 +60,9 @@ src/lib/stocks.ts    xStock registry (verified mints), TokenBadge PDAs, keeper f
 src/lib/price.ts     Jupiter Price v3 + ScaledUiAmount multiplier + PausableConfig
 src/lib/presets.ts   USD-denominated curve presets
 src/lib/curve.ts     USD → stock curve engine + exact curve simulation (SDK math)
-src/lib/dbc.ts       launch tx builder (config + pool + first buy), swap, listing
+src/lib/dbc.ts       launch tx builder (config + pool + first buy), swap2 PartialFill, listing
+src/lib/zap.ts       Buy with SOL: Jupiter SOL → xStock route
+src/lib/launches.ts  launch index from the platform wallet's signature history (no getProgramAccounts)
 src/app/launch       launch wizard with live curve preview
 src/app/t/[mint]     token page: progress, chart, trade, creator fee claim
 src/app/presets      preset gallery + JSON export
@@ -114,7 +120,8 @@ After the run the pool held 2.206 mock-stock in quote reserve, and the creator h
 
 ## Roadmap
 
-- Stock-relative charts (token / underlying performance, "alpha vs NVDA").
+- Alpha-vs-stock history chart (today the token page shows it since launch).
+- Sell to SOL (reverse of Buy with SOL).
 - Basket quotes (e.g. a Mag-7 basket token as quote).
 - Market-cap-based DAMM v2 fee scheduler after graduation.
 - Referral fees paid in stock.
