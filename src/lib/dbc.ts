@@ -8,11 +8,18 @@ import {
     type VirtualPool,
 } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import type { LaunchPlan } from './curve'
+import type { LaunchRef } from './launches'
 import { tokenBadgeFor } from './stocks'
 
 export const PLATFORM_FEE_CLAIMER = new PublicKey(
     process.env.NEXT_PUBLIC_PLATFORM_FEE_CLAIMER ?? '11111111111111111111111111111111'
 )
+
+/** confirmTransaction resolves even when the tx failed on-chain; this throws instead. */
+export async function confirmOrThrow(connection: Connection, sig: string) {
+    const { value } = await connection.confirmTransaction(sig, 'confirmed')
+    if (value.err) throw new Error(`Transaction failed on-chain (${JSON.stringify(value.err)}) — ${sig.slice(0, 10)}…`)
+}
 
 export const dbcClient = (connection: Connection) => new DynamicBondingCurveClient(connection, 'confirmed')
 
@@ -149,10 +156,17 @@ export async function buildSwapTx(connection: Connection, owner: PublicKey, view
     return tx
 }
 
-/** All launches made through this platform = all configs whose fee claimer is the platform wallet. */
+/** All launches made through this platform (configs whose fee claimer is the platform wallet), via /api/launches. */
 export async function listPlatformLaunches(connection: Connection) {
+    const res = await fetch('/api/launches')
+    const refs = (await res.json()) as LaunchRef[] | { error: string }
+    if ('error' in refs) throw new Error(refs.error)
     const client = dbcClient(connection)
-    const configs = await client.state.getPoolConfigsByOwner(PLATFORM_FEE_CLAIMER)
-    const pools = await Promise.all(configs.map((c) => client.state.getPoolsByConfig(c.publicKey).then((ps) => ps.map((p) => ({ ...p, config: c.account })))))
-    return pools.flat()
+    const rows = await Promise.all(
+        refs.map(async (r) => {
+            const [account, config] = await Promise.all([client.state.getPool(r.pool), client.state.getPoolConfig(r.config)])
+            return account && config ? { publicKey: new PublicKey(r.pool), account, config } : null
+        })
+    )
+    return rows.filter((r) => r !== null)
 }

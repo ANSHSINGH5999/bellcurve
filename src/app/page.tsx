@@ -85,7 +85,7 @@ export default function Home() {
                 {rows?.length === 0 && (
                     <p className="text-sm text-muted">
                         No launches yet — <Link className="underline" href="/launch">be the first</Link>.
-                        {err && <span className="block text-xs">(RPC: {err.slice(0, 120)} — set NEXT_PUBLIC_RPC_URL to an RPC that allows getProgramAccounts)</span>}
+                        {err && <span className="block text-xs">(Couldn’t load launches: {err.slice(0, 120)})</span>}
                     </p>
                 )}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

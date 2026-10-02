@@ -7,12 +7,13 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import { getPriceFromSqrtPrice, type ConfigParameters } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import CurveChart from '@/components/CurveChart'
 import { simulateCurve, TOTAL_SUPPLY } from '@/lib/curve'
-import { buildSwapTx, dbcClient, loadPoolByMint, quoteSwap, type PoolView } from '@/lib/dbc'
+import { buildSwapTx, confirmOrThrow, dbcClient, loadPoolByMint, quoteSwap, type PoolView } from '@/lib/dbc'
 import { explorer } from '@/lib/env'
 import { fmtUsd, useStockQuote } from '@/lib/hooks'
 import { fetchTokenMeta, type TokenMeta } from '@/lib/metadata'
 import { getPreset } from '@/lib/presets'
 import { getStock } from '@/lib/stocks'
+import { buildSolToStockTx, quoteSolToStock, type JupQuote } from '@/lib/zap'
 
 export default function TokenPage({ params }: { params: Promise<{ mint: string }> }) {
     const { mint } = use(params)
@@ -41,11 +42,13 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
         if (!view) return null
         const baseDec = view.config.tokenDecimal
         const priceStock = getPriceFromSqrtPrice(view.pool.poolState.sqrtPrice, baseDec, qDec).toNumber()
+        // priced in shares, so the change in stock terms is exactly the return vs. just holding the stock
+        const alphaPct = (priceStock / getPriceFromSqrtPrice(view.config.sqrtStartPrice, baseDec, qDec).toNumber() - 1) * 100
         const points = simulateCurve(view.config as unknown as ConfigParameters, qDec, usdPerRaw || 1)
         const nearest = points.reduce((a, b) => (Math.abs(b.priceStock - priceStock) < Math.abs(a.priceStock - priceStock) ? b : a), points[0])
         const raisedStock = Number(view.pool.poolState.quoteReserve.toString()) / 10 ** qDec
         const creatorFeeStock = Number(view.pool.poolState.creatorQuoteFee.toString()) / 10 ** qDec
-        return { baseDec, priceStock, points, marker: nearest?.pctSold, raisedStock, creatorFeeStock }
+        return { baseDec, priceStock, alphaPct, points, marker: nearest?.pctSold, raisedStock, creatorFeeStock }
     }, [view, qDec, usdPerRaw])
 
     if (view === undefined) return <p className="text-muted">Loading pool…</p>
@@ -91,6 +94,19 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
                     </div>
                 </div>
 
+                <div className="card flex items-center justify-between gap-4 p-5">
+                    <div>
+                        <div className="text-xs text-muted">Since launch, vs. just holding {stock?.symbol ?? 'the stock'}</div>
+                        <div className={`mono text-2xl font-semibold ${derived.alphaPct >= 0 ? 'text-accent' : 'text-danger'}`}>
+                            {derived.alphaPct >= 0 ? '+' : ''}
+                            {derived.alphaPct.toFixed(1)}%
+                        </div>
+                    </div>
+                    <p className="max-w-xs text-right text-xs text-muted">
+                        This token is priced in {stock?.symbol ?? 'stock'}, so {stock?.ticker ?? 'the stock'} moving up or down doesn’t change this number. It’s pure outperformance.
+                    </p>
+                </div>
+
                 <div className="card grid grid-cols-2 gap-3 p-5 text-sm sm:grid-cols-4">
                     <Mini k="Price" v={`${derived.priceStock.toExponential(3)} ${stock?.symbol ?? ''}`} />
                     <Mini k="Price (USD)" v={fmtUsd(derived.priceStock * usdPerRaw)} />
@@ -126,38 +142,63 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
     const { connection } = useConnection()
     const wallet = useWallet()
     const [side, setSide] = useState<'buy' | 'sell'>('buy')
+    const [paySol, setPaySol] = useState(false)
+    const [jup, setJup] = useState<JupQuote | null>(null)
     const [amt, setAmt] = useState('')
     const [out, setOut] = useState<{ out: BN; min: BN; left: BN } | null>(null)
     const [msg, setMsg] = useState('')
     const sell = side === 'sell'
-    const inDec = sell ? baseDec : qDec
+    const viaSol = paySol && !sell
+    const inDec = sell ? baseDec : viaSol ? 9 : qDec
     const outDec = sell ? qDec : baseDec
     // wallets show xStocks in UI units (raw × ScaledUiAmount multiplier); the curve trades raw units
-    const toRaw = (n: number) => new BN(Math.floor((sell ? n : n / multiplier) * 10 ** inDec).toString())
+    const toRaw = (n: number) => new BN(Math.floor((sell || viaSol ? n : n / multiplier) * 10 ** inDec).toString())
 
     useEffect(() => {
         setOut(null)
+        setJup(null)
         setMsg('')
         const n = Number(amt)
         if (!(n > 0)) return
-        const amountIn = toRaw(n)
-        const t = setTimeout(() => {
-            quoteSwap(connection, view, amountIn, sell, 100)
-                .then((q) => setOut({ out: new BN(q.outputAmount.toString()), min: new BN(q.minimumAmountOut.toString()), left: new BN(q.amountLeft.toString()) }))
-                .catch((e) => setMsg(e.message))
-        }, 250)
+        const t = setTimeout(async () => {
+            try {
+                let amountIn = toRaw(n)
+                if (viaSol) {
+                    // size the curve buy to Jupiter's guaranteed minimum so tx 2 can never be short of stock
+                    const jq = await quoteSolToStock(view.config.quoteMint.toBase58(), BigInt(amountIn.toString()))
+                    setJup(jq)
+                    amountIn = new BN(jq.otherAmountThreshold)
+                }
+                const q = await quoteSwap(connection, view, amountIn, sell, 100)
+                setOut({ out: new BN(q.outputAmount.toString()), min: new BN(q.minimumAmountOut.toString()), left: new BN(q.amountLeft.toString()) })
+            } catch (e) {
+                setMsg((e as Error).message)
+            }
+        }, 300)
         return () => clearTimeout(t)
-    }, [amt, sell, inDec, multiplier, connection, view])
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- toRaw is derived from the listed deps
+    }, [amt, sell, viaSol, inDec, multiplier, connection, view])
 
     async function trade() {
         if (!wallet.publicKey || !wallet.signTransaction || !out) return
         try {
             setMsg('Confirm in wallet…')
-            const amountIn = toRaw(Number(amt))
-            const tx = await buildSwapTx(connection, wallet.publicKey, view, amountIn, out.min, sell)
-            const signed = await wallet.signTransaction(tx)
-            const sig = await connection.sendRawTransaction(signed.serialize())
-            await connection.confirmTransaction(sig, 'confirmed')
+            let sig: string
+            if (viaSol && jup && wallet.signAllTransactions) {
+                // one approval, two txs: Jupiter SOL -> stock, then the curve buy with the guaranteed minimum
+                const swapTx = await buildSolToStockTx(jup, wallet.publicKey)
+                const buyTx = await buildSwapTx(connection, wallet.publicKey, view, new BN(jup.otherAmountThreshold), out.min, false)
+                const [s1, s2] = await wallet.signAllTransactions([swapTx, buyTx] as (typeof swapTx | typeof buyTx)[])
+                setMsg(`Swapping SOL → ${stockSymbol}…`)
+                const sig1 = await connection.sendRawTransaction(s1.serialize())
+                await confirmOrThrow(connection, sig1)
+                setMsg('Buying on the curve…')
+                sig = await connection.sendRawTransaction(s2.serialize())
+            } else {
+                const tx = await buildSwapTx(connection, wallet.publicKey, view, toRaw(Number(amt)), out.min, sell)
+                sig = await connection.sendRawTransaction((await wallet.signTransaction(tx)).serialize())
+            }
+            await confirmOrThrow(connection, sig)
             setMsg(`✅ Done — ${sig.slice(0, 10)}…`)
             setAmt('')
             onDone()
@@ -176,13 +217,27 @@ function TradePanel(props: { view: PoolView; stockSymbol: string; qDec: number; 
                     </button>
                 ))}
             </div>
-            <label className="label">{sell ? 'Tokens to sell' : `${stockSymbol} to spend`}</label>
+            {!sell && (
+                <div className="flex gap-2 text-xs">
+                    {[false, true].map((v) => (
+                        <button key={String(v)} onClick={() => setPaySol(v)} className={`tag ${paySol === v ? 'border-accent text-accent' : ''}`}>
+                            Pay with {v ? 'SOL' : stockSymbol}
+                        </button>
+                    ))}
+                </div>
+            )}
+            <label className="label">{sell ? 'Tokens to sell' : `${viaSol ? 'SOL' : stockSymbol} to spend`}</label>
             <input className="input mono" type="number" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="0.0" />
             <div className="text-sm text-muted">
                 You receive ≈ <span className="mono text-text">{out ? outNum.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'}</span>{' '}
                 {sell ? stockSymbol : 'tokens'}
                 {sell && out && <span className="mono"> ({fmtUsd((outNum * usdPerRaw) / multiplier)})</span>}
             </div>
+            {viaSol && jup && (
+                <p className="text-xs text-muted">
+                    Routed by Jupiter: {amt} SOL → ≥ {((Number(jup.otherAmountThreshold) / 10 ** qDec) * multiplier).toFixed(4)} {stockSymbol} → curve. Any extra {stockSymbol} stays in your wallet.
+                </p>
+            )}
             {!sell && out && out.left.gtn(0) && (
                 <p className="text-xs text-accent">
                     This buy completes the curve 🎓 — only part of it is used; {((Number(out.left.toString()) / 10 ** qDec) * multiplier).toFixed(4)} {stockSymbol} stays in your wallet.
@@ -213,7 +268,7 @@ function ClaimPanel({ view, amount, symbol, onDone }: { view: PoolView; amount: 
             tx.feePayer = wallet.publicKey
             tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash
             const sig = await connection.sendRawTransaction((await wallet.signTransaction(tx)).serialize())
-            await connection.confirmTransaction(sig, 'confirmed')
+            await confirmOrThrow(connection, sig)
             setMsg('✅ Claimed')
             onDone()
         } catch (e) {

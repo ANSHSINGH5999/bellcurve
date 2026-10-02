@@ -6,7 +6,8 @@ import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js'
 import { getOrCreateAssociatedTokenAccount, mintTo, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token'
 import { DAMM_V2_MIGRATION_FEE_ADDRESS, DAMM_V2_PROGRAM_ID, deriveDammV2PoolAddress } from '@meteora-ag/dynamic-bonding-curve-sdk'
 import { buildLaunchPlan } from '../src/lib/curve'
-import { buildLaunchTx, buildSwapTx, dbcClient, loadPoolByMint, quoteSwap } from '../src/lib/dbc'
+import { buildLaunchTx, buildSwapTx, dbcClient, loadPoolByMint, PLATFORM_FEE_CLAIMER, quoteSwap } from '../src/lib/dbc'
+import { findLaunches } from '../src/lib/launches'
 import { getPreset, PRESETS } from '../src/lib/presets'
 import { getStock } from '../src/lib/stocks'
 
@@ -81,13 +82,21 @@ async function lifecycle(presetId: string) {
     console.log(
         `✓ ${preset.id.padEnd(15)} launch+first buy, buy, sell, claim ${(Number(fee) / 1e8).toFixed(4)} NVDAx fees, fill (${(Number(qf.amountLeft) / 1e8).toFixed(2)} NVDAx unspent), migrate ${sig.slice(0, 8)}… -> DAMM v2 ${damm.toBase58()}`
     )
+    return v.address.toBase58()
 }
 
 async function main() {
     await conn.confirmTransaction(await conn.requestAirdrop(kp.publicKey, 50e9), 'confirmed')
     const ata = await getOrCreateAssociatedTokenAccount(conn, kp, NVDAX, kp.publicKey, false, 'confirmed', undefined, TOKEN_2022_PROGRAM_ID)
     await mintTo(conn, kp, NVDAX, ata.address, kp, BigInt(50_000) * BigInt(1e8), [], undefined, TOKEN_2022_PROGRAM_ID)
-    for (const p of PRESETS) await lifecycle(p.id)
+    const pools: string[] = []
+    for (const p of PRESETS) pools.push(await lifecycle(p.id))
+
+    // the launch index must find exactly these pools from signature history alone (no getProgramAccounts)
+    const found = (await findLaunches(conn, PLATFORM_FEE_CLAIMER)).map((l) => l.pool)
+    const missing = pools.filter((p) => !found.includes(p))
+    if (missing.length || found.length !== pools.length) throw new Error(`launch index mismatch: found ${found.length}, missing ${missing}`)
+    console.log(`✓ launch index found all ${found.length} launches without getProgramAccounts`)
 }
 
 main().catch((e) => {

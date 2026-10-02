@@ -6,7 +6,7 @@ import { useConnection, useWallet } from '@solana/wallet-adapter-react'
 import { useWalletModal } from '@solana/wallet-adapter-react-ui'
 import CurveChart from '@/components/CurveChart'
 import { buildLaunchPlan, LaunchPlanError, type LaunchPlan } from '@/lib/curve'
-import { buildLaunchTx } from '@/lib/dbc'
+import { buildLaunchTx, confirmOrThrow } from '@/lib/dbc'
 import { CLUSTER, SITE_URL, explorer } from '@/lib/env'
 import { fmtUsd, useStockQuote, useUsdPrices } from '@/lib/hooks'
 import { PRESETS, getPreset } from '@/lib/presets'
@@ -85,7 +85,7 @@ export default function LaunchPage() {
             for (const [i, tx] of signed.entries()) {
                 setStatus(i === 0 ? 'Creating stock-quoted curve config…' : 'Creating pool' + (firstBuyRaw ? ' + your first buy…' : '…'))
                 const sig = await connection.sendRawTransaction(tx.serialize(), { skipPreflight: false })
-                await connection.confirmTransaction(sig, 'confirmed')
+                await confirmOrThrow(connection, sig)
             }
             router.push(`/t/${baseMintKeypair.publicKey.toBase58()}?pool=${pool.toBase58()}`)
         } catch (e) {
