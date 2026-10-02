@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StockCurve — token launches priced in equities
 
-## Getting Started
+**A Meteora Dynamic Bonding Curve launchpad where every curve is quoted in a tokenized stock (xStocks: SPYx, NVDAx, TSLAx, …).**
+Buyers pay in stock. Creators earn stock. Every graduated pool adds equity liquidity to Meteora DAMM v2.
 
-First, run the development server:
+> Submission for *Best use of Meteora's Dynamic Bonding Curve* — Colosseum Crypto World's Fair sidetrack.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Why this matters
+
+Launchpads today price everything in SOL or USDC. That leaves out a whole class of assets: tokens whose value is naturally measured **against a stock**:
+
+- **Ticker-themed and narrative tokens** ("the Robotaxi token") trade as a bet *relative to* TSLA. Pricing them in TSLAx makes that bet explicit.
+- **RWA wrappers, baskets and revenue-share tokens** have a fundamental anchor. A near-flat curve in SPYx fits them far better than a 100x meme curve in SOL.
+- **Creators accumulate equity.** Fees are collected in the quote asset, so a creator's income is SPYx/NVDAx, not their own token. That's a healthier incentive than selling into their own community.
+- **xStocks gain organic demand and liquidity.** Every launch buys stock on the way in, and every graduation seeds a DAMM v2 pool paired with an xStock.
+
+## What's built
+
+| Area | Detail |
+|---|---|
+| Stock-quoted DBC configs | One config per launch with `quoteMint = xStock`. All 12 supported xStocks were verified on mainnet to have a **DBC TokenBadge**, which is passed as a remaining account. |
+| USD → equity curve engine | `src/lib/curve.ts` converts USD market-cap targets into raw stock units using the Jupiter price × the xStock **ScaledUiAmount multiplier**, so dividends don't silently reprice the curve. |
+| Keeper-floor guard | Meteora keepers auto-migrate stock-quoted pools only when `migration_quote_threshold ≥ $750` equivalent. The engine rejects plans below the floor and warns near it. |
+| 5 curve presets | Fair Discovery · Opening Bell (exponential anti-snipe fee, 50%→1% over 3 min) · Earnings Run (16-segment liquidity weights 1→12x) · Flat RWA (≈1.6x price range, compounding DAMM v2 after graduation) · Long Curve (two segments, $750k graduation). |
+| Preset export | `/presets` exports any preset as ready-to-use `ConfigParameters` JSON for other launchpads (a DBC config preset marketplace). |
+| Unsnipeable creator buy | `createConfigAndPoolWithFirstBuy` with `enableFirstSwapWithMinFee`: the creator's first buy lands in the pool-creation tx. |
+| Issuer-pause awareness | Reads the xStock `PausableConfig`. If the issuer pauses the mint, launch and trade are disabled in the UI instead of failing on-chain. |
+| Safe graduation | 60% of graduated LP is permanently locked (partner 50 + creator 10), and token authority is immutable. |
+| Trading + fee claim | Buy and sell on the curve with SDK quotes and slippage protection. Creators claim fees in stock from the token page. |
+| Tests | 27 vitest cases: every preset × 5 price regimes passes the SDK's own `validateConfigParameters`, stays above the keeper floor, has a monotonic price, and raises ≈ the threshold. |
+
+## Architecture
+
+```
+src/lib/stocks.ts    xStock registry (verified mints), TokenBadge PDAs, keeper floor
+src/lib/price.ts     Jupiter Price v3 + ScaledUiAmount multiplier + PausableConfig
+src/lib/presets.ts   USD-denominated curve presets
+src/lib/curve.ts     USD → stock curve engine + exact curve simulation (SDK math)
+src/lib/dbc.ts       launch tx builder (config + pool + first buy), swap, listing
+src/app/launch       launch wizard with live curve preview
+src/app/t/[mint]     token page: progress, chart, trade, creator fee claim
+src/app/presets      preset gallery + JSON export
+scripts/devnet-e2e   mock stock → launch → buy → sell on devnet
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Run
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm install
+cp .env.example .env.local   # set RPC (Helius etc.), platform wallet, site URL
+pnpm test                    # curve engine tests
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Devnet end-to-end
 
-## Learn More
+```bash
+solana airdrop 2 --url devnet
+pnpm devnet:e2e              # creates a mock 8-dec Token-2022 "stock", launches, buys, sells
+# then set NEXT_PUBLIC_CLUSTER=devnet and NEXT_PUBLIC_DEVNET_MOCK_STOCK_MINT=<printed mint>
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Roadmap
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Stock-relative charts (token / underlying performance, "alpha vs NVDA").
+- Basket quotes (e.g. a Mag-7 basket token as quote).
+- Market-cap-based DAMM v2 fee scheduler after graduation.
+- Referral fees paid in stock.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Not investment advice. xStocks are not available to US persons. Check eligibility in your jurisdiction.

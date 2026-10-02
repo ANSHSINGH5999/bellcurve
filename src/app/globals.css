@@ -1,26 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #07090d;
+  --panel: #0e131b;
+  --line: #1c2533;
+  --text: #e6edf6;
+  --muted: #8392a7;
+  --accent: #34d399;
+  --accent2: #60a5fa;
+  --danger: #f87171;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent2: var(--accent2);
+  --color-danger: var(--danger);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html, body { background: var(--bg); color: var(--text); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+.btn { border-radius: 10px; padding: 0.6rem 1rem; font-weight: 600; transition: opacity .15s, transform .05s; }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #04120c; }
+.btn-ghost { border: 1px solid var(--line); color: var(--text); }
+.input { width: 100%; background: #0a0f16; border: 1px solid var(--line); border-radius: 10px; padding: .6rem .8rem; color: var(--text); outline: none; }
+.input:focus { border-color: var(--accent2); }
+.label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .35rem; display: block; }
+.mono { font-family: var(--font-mono); }
+.tag { font-size: .7rem; border: 1px solid var(--line); border-radius: 999px; padding: .15rem .55rem; color: var(--muted); }
+
+/* wallet-adapter button harmonisation */
+.wallet-adapter-button { height: 40px !important; border-radius: 10px !important; font-size: .9rem !important; background: #182231 !important; }
