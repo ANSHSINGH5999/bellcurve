@@ -10,8 +10,8 @@ export default function Header() {
         <header className="border-b border-line">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
                 <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-                    <span className="grid h-7 w-7 place-items-center rounded-md bg-accent text-sm text-black">SC</span>
-                    StockCurve
+                    <span className="grid h-7 w-7 place-items-center rounded-md bg-accent text-sm text-black">BC</span>
+                    BellCurve
                     {CLUSTER === 'devnet' && <span className="tag">devnet</span>}
                 </Link>
                 <nav className="hidden gap-5 text-sm text-muted sm:flex">

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full StockCurve lifecycle against *mainnet state* on a local validator, at zero cost:
+# Full BellCurve lifecycle against *mainnet state* on a local validator, at zero cost:
 # real DBC + DAMM v2 programs, real NVDAx mint (mint authority patched locally so we can mint test NVDAx),
 # real DBC and DAMM v2 TokenBadges for NVDAx. Then: launch -> first buy -> buy -> sell -> claim -> fill -> migrate to DAMM v2.
 set -euo pipefail

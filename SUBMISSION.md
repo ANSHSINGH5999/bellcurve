@@ -1,10 +1,10 @@
-# StockCurve: win plan for the Meteora DBC track
+# BellCurve: win plan for the Meteora DBC track
 
 **Prize pool:** 10k USDC, split 5k / 3k / 1.5k / 500 / … for 5 places. Separate discretionary infra grants go to AI/RWA DBC projects.
 **Deadline:** 13 Oct 2026, 12:29 PM IST (06:59 UTC). Winners are announced 31 Oct.
 **Competition:** 14 submissions as of 1 Oct.
 
-## How the judges score, and how StockCurve answers
+## How the judges score, and how BellCurve answers
 
 | Criterion | Our answer |
 |---|---|
@@ -37,7 +37,7 @@
 
 ## Demo video script (2.5 min)
 
-1. **0:00 Hook.** "Every launchpad prices tokens in SOL. StockCurve prices them in NVIDIA."
+1. **0:00 Hook.** "Every launchpad prices tokens in SOL. BellCurve prices them in NVIDIA."
 2. **0:15 Problem.** Narrative and RWA tokens are bets relative to equities, but they're quoted in SOL. Creators farm their own token.
 3. **0:35 Launch flow.** Pick NVDAx, pick a preset, and show the live curve and the keeper-floor check. Point out that the dividend multiplier is applied.
 4. **1:15 On-chain.** Show the two txs on Solscan: a config with quote = NVDAx plus TokenBadge, then the pool plus the unsnipeable first buy.
@@ -47,15 +47,15 @@
 
 ## Submission text (paste and edit)
 
-**Title:** StockCurve: token launches priced in equities
+**Title:** BellCurve: token launches priced in equities
 
 **One-liner:** A Meteora DBC launchpad where every bonding curve is quoted in a tokenized stock (SPYx, NVDAx, TSLAx…), so buyers pay in stock, creators earn stock, and every graduation seeds a DAMM v2 xStock pool.
 
-**What it does:** StockCurve creates a dedicated DBC config per launch with an xStock as the quote mint, passing the mint's DBC TokenBadge. A USD → equity curve engine converts market-cap targets into raw stock units using live Jupiter prices and each xStock's ScaledUiAmount dividend multiplier. It enforces Meteora's $750 keeper floor so every curve auto-graduates to DAMM v2. Five presets ship with it (including an exponential anti-snipe "Opening Bell" and a near-flat "Flat RWA" curve that graduates into a compounding DAMM v2 pool), and each one is exportable as ConfigParameters JSON. Anyone can buy with plain SOL (Jupiter routes SOL → xStock, then the curve buy, in one wallet approval), and the token page shows each token's return vs. just holding the stock. Creators' first buys land in the creation tx, fees are paid in stock, and 60% of graduated LP is permanently locked. Buys use DBC's PartialFill swap mode, so the graduating buy can never revert. The full lifecycle (launch → trade → claim → migrate to DAMM v2) is tested for all five presets against real mainnet program and NVDAx state.
+**What it does:** BellCurve creates a dedicated DBC config per launch with an xStock as the quote mint, passing the mint's DBC TokenBadge. A USD → equity curve engine converts market-cap targets into raw stock units using live Jupiter prices and each xStock's ScaledUiAmount dividend multiplier. It enforces Meteora's $750 keeper floor so every curve auto-graduates to DAMM v2. Five presets ship with it (including an exponential anti-snipe "Opening Bell" and a near-flat "Flat RWA" curve that graduates into a compounding DAMM v2 pool), and each one is exportable as ConfigParameters JSON. Anyone can buy with plain SOL (Jupiter routes SOL → xStock, then the curve buy, in one wallet approval), and the token page shows each token's return vs. just holding the stock. Creators' first buys land in the creation tx, fees are paid in stock, and 60% of graduated LP is permanently locked. Buys use DBC's PartialFill swap mode, so the graduating buy can never revert. The full lifecycle (launch → trade → claim → migrate to DAMM v2) is tested for all five presets against real mainnet program and NVDAx state.
 
 **Links:**
-- GitHub: https://github.com/ANSHSINGH5999/stockcurve
-- Live app: https://stockcurve.vercel.app
+- GitHub: https://github.com/ANSHSINGH5999/bellcurve
+- Live app: https://bellcurve.vercel.app
 - Demo video: TODO
 - Example mainnet token: TODO (after the first real NVDAx launch)
 - Proof: README "Proof" section (devnet tx signatures) and `pnpm fork:e2e`, which runs every preset on cloned mainnet state (real DBC + DAMM v2 programs, real NVDAx mint and TokenBadges) from launch through creator fee claim to graduation into DAMM v2.

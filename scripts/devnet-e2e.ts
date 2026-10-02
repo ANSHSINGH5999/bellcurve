@@ -1,5 +1,5 @@
 /**
- * End-to-end devnet proof: mock xStock (Token-2022, 8 decimals) -> StockCurve launch -> buy -> sell.
+ * End-to-end devnet proof: mock xStock (Token-2022, 8 decimals) -> BellCurve launch -> buy -> sell.
  *
  *   solana-keygen new -o ~/.config/solana/id.json   (if you don't have one)
  *   solana airdrop 2 --url devnet                   (or https://faucet.solana.com)
@@ -59,9 +59,9 @@ async function main() {
         ...plan.config,
         preCreatePoolParam: {
             baseMint: baseMint.publicKey,
-            name: 'StockCurve Devnet Test',
+            name: 'BellCurve Devnet Test',
             symbol: 'SCDT',
-            uri: 'https://stockcurve.vercel.app/api/meta?n=StockCurve%20Devnet%20Test&s=SCDT&q=mNVDAx&p=' + PRESET,
+            uri: 'https://bellcurve.vercel.app/api/meta?n=BellCurve%20Devnet%20Test&s=SCDT&q=mNVDAx&p=' + PRESET,
             poolCreator: payer.publicKey,
         },
         firstBuyParam: {

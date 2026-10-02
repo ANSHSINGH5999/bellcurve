@@ -9,7 +9,7 @@ import { PRESETS } from '../src/lib/presets'
 // Representative prices (USD per raw whole xStock) spanning cheap → expensive stocks
 const PRICES = { HOODx: 120, NVDAx: 231, TSLAx: 356, SPYx: 766, MSTRx: 1500 }
 
-describe('StockCurve launch engine', () => {
+describe('BellCurve launch engine', () => {
     for (const preset of PRESETS) {
         for (const [sym, px] of Object.entries(PRICES)) {
             it(`${preset.id} × ${sym} builds a valid DBC config above the keeper floor`, () => {

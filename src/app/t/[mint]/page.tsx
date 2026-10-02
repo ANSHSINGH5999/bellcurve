@@ -52,7 +52,7 @@ export default function TokenPage({ params }: { params: Promise<{ mint: string }
     }, [view, qDec, usdPerRaw])
 
     if (view === undefined) return <p className="text-muted">Loading pool…</p>
-    if (view === null || !derived) return <p className="text-muted">No StockCurve pool found for {mint}.</p>
+    if (view === null || !derived) return <p className="text-muted">No BellCurve pool found for {mint}.</p>
 
     const isCreator = wallet.publicKey?.equals(view.pool.poolState.creator)
     const preset = meta?.preset ? getPreset(meta.preset) : undefined

@@ -1,4 +1,4 @@
-# StockCurve — token launches priced in equities
+# BellCurve — token launches priced in equities
 
 **A Meteora Dynamic Bonding Curve launchpad where every curve is quoted in a tokenized stock (xStocks: SPYx, NVDAx, TSLAx, …).**
 Buyers pay in stock. Creators earn stock. Every graduated pool adds equity liquidity to Meteora DAMM v2.

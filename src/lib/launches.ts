@@ -4,7 +4,7 @@ import { DynamicBondingCurveIdl, DYNAMIC_BONDING_CURVE_PROGRAM_ID } from '@meteo
 /**
  * Launch index without getProgramAccounts (which most free RPCs block):
  * create_config lists the platform wallet as `fee_claimer`, so the platform wallet's signature history
- * contains every StockCurve config. Each config's oldest transactions contain its pool initialization.
+ * contains every BellCurve config. Each config's oldest transactions contain its pool initialization.
  */
 export type LaunchRef = { config: string; quoteMint: string; pool: string; baseMint: string; createdAt: number | null }
 

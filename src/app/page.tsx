@@ -48,7 +48,7 @@ export default function Home() {
                         Launch tokens priced in <span className="text-accent">equities</span>, not SOL.
                     </h1>
                     <p className="text-muted">
-                        StockCurve is a launchpad where every bonding curve is quoted in a tokenized stock — SPYx, NVDAx, TSLAx and more. Buyers pay in
+                        BellCurve is a launchpad where every bonding curve is quoted in a tokenized stock — SPYx, NVDAx, TSLAx and more. Buyers pay in
                         stock, creators earn stock, and every graduated pool deepens on-chain equity liquidity on Meteora DAMM v2.
                     </p>
                     <div className="flex gap-3">

@@ -4,7 +4,7 @@ import Providers from '@/components/Providers'
 import Header from '@/components/Header'
 
 export const metadata: Metadata = {
-    title: 'StockCurve — launch tokens paired with tokenized stocks',
+    title: 'BellCurve — launch tokens paired with tokenized stocks',
     description:
         'A Meteora DBC launchpad where every token is quoted in an xStock (SPYx, NVDAx, TSLAx…). Creators earn equity, curves graduate to DAMM v2.',
 }

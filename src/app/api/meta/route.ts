@@ -16,7 +16,7 @@ export async function GET(req: Request) {
             name,
             symbol,
             image,
-            description: `${name} launched on StockCurve — bonding curve quoted in ${quote}.`,
+            description: `${name} launched on BellCurve — bonding curve quoted in ${quote}.`,
             attributes: [
                 { trait_type: 'quote', value: quote },
                 { trait_type: 'curve', value: preset },
